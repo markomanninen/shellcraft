@@ -1,0 +1,29 @@
+{
+  "name": "demo-shop",
+  "version": "1.0.0",
+  "description": "SSH-based terminal application",
+  "main": "src/server/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server/index.js",
+    "dev": "nodemon src/server/index.js",
+    "generate-keys": "node scripts/generate-keys.js",
+    "test": "npm run test:unit && npm run test:e2e",
+    "test:unit": "node --test test/unit/**/*.test.js",
+    "test:e2e": "node --test test/e2e/**/*.test.js",
+    "test:watch": "node --test --watch"
+  },
+  "keywords": ["ssh", "terminal", "tui", "shop", "cli"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "ssh2": "^1.15.0",
+    "blessed": "^0.1.81",
+    "dotenv": "^16.4.5",
+    "nanoid": "^5.0.4"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2",
+    "ssh2-streams": "^0.4.10"
+  }
+}
