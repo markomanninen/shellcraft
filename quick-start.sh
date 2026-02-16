@@ -24,14 +24,18 @@ echo "     - CPU & Memory stats"
 echo "     - Process monitor"
 echo "     - Real-time data from YOUR Mac"
 echo ""
-echo "  4) 🧪 Run Tests (Verify everything works)"
+echo "  4) 🎨 Animation Demo (ASCII Art)"
+echo "     - 7 terminal animations"
+echo "     - Runs directly (no SSH)"
 echo ""
-echo "  5) 🆕 Create New App (Use the template)"
+echo "  5) 🧪 Run Tests (Verify everything works)"
+echo ""
+echo "  6) 🆕 Create New App (Use the template)"
 echo ""
 echo "  0) Exit"
 echo ""
 
-read -p "Enter choice [0-5]: " choice
+read -p "Enter choice [0-6]: " choice
 
 case $choice in
   1)
@@ -96,6 +100,21 @@ case $choice in
   
   4)
     echo ""
+    echo "🎨 Starting Animation Demo..."
+    cd animation-demo || exit
+    if [ ! -d "node_modules" ]; then
+      echo "📦 Installing dependencies..."
+      npm install
+    fi
+    echo ""
+    echo "✅ Ready! Starting animations..."
+    echo "⚠️  Press q or Ctrl+C to stop"
+    echo ""
+    npm start
+    ;;
+
+  5)
+    echo ""
     echo "🧪 Running Tests..."
     echo ""
     cd demo-shop || exit
@@ -115,7 +134,7 @@ case $choice in
     echo ""
     ;;
   
-  5)
+  6)
     echo ""
     read -p "Enter your app name: " appname
     if [ -z "$appname" ]; then
@@ -143,7 +162,7 @@ case $choice in
   
   *)
     echo ""
-    echo "❌ Invalid choice. Please run again and choose 0-5."
+    echo "❌ Invalid choice. Please run again and choose 0-6."
     echo ""
     exit 1
     ;;

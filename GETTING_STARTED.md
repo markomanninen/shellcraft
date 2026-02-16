@@ -15,8 +15,8 @@ chmod +x init.sh
 ## Step 2: Generate a New App
 
 ```bash
-./init.sh my-app            # defaults to ecommerce template
-./init.sh my-app minimal    # bare-bones starter template
+./init.sh my-app            # defaults to minimal template
+./init.sh my-app ecommerce  # e-commerce starter template
 ```
 
 The first argument is the project name, the second is the app type (`ecommerce` or `minimal`).

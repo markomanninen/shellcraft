@@ -8,7 +8,7 @@ A template generator and collection of demo applications for building SSH-based 
 
 ```
 terminal_example/
-├── init.sh                        # Template generator script (~1,634 lines)
+├── init.sh                        # Template generator script (~1,633 lines)
 ├── quick-start.sh                 # Quick setup helper script
 ├── README.md                      # Project overview
 ├── COMPLETE_OVERVIEW.md           # Full project overview
@@ -129,13 +129,14 @@ terminal_example/
 └── animation-demo/                # Standalone terminal animation viewer
     ├── package.json
     ├── .gitignore
+    ├── README.md
     ├── index.js                   # Entry point and animation runner
     └── animations.js              # Animation frame definitions
 ```
 
 ## Template Generator (`init.sh`)
 
-The generator script is ~1,634 lines of bash. Running `./init.sh <app-name>` produces a complete SSH terminal app with server, UI, models, tests, configuration, and documentation.
+The generator script is ~1,633 lines of bash. Running `./init.sh <app-name>` produces a complete SSH terminal app with server, UI, models, tests, configuration, and documentation.
 
 ### Usage
 ```bash

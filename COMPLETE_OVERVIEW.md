@@ -8,7 +8,7 @@ A template system for building SSH-based terminal applications, with **4 demo ap
 
 ### 1. Template Generator (`init.sh`)
 
-A single bash script (~1,634 lines) that generates a complete terminal app with:
+A single bash script (~1,633 lines) that generates a complete terminal app with:
 - SSH server (ssh2)
 - Terminal UI (blessed)
 - Session management
