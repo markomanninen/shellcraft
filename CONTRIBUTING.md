@@ -22,8 +22,8 @@ This project adheres to a code of conduct. By participating, you are expected to
 1. **Fork the Repository**
    ```bash
    # Fork via GitHub UI, then clone your fork
-   git clone https://github.com/YOUR_USERNAME/terminal_example.git
-   cd terminal_example
+   git clone https://github.com/YOUR_USERNAME/shellcraft.git
+   cd shellcraft
    ```
 
 2. **Set Up Development Environment**

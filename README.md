@@ -91,7 +91,7 @@ Each app runs on port 2222 by default (configurable via `SSH_PORT` in `.env`).
 ## Project Structure
 
 ```
-terminal_example/
+shellcraft/
 ├── init.sh                  # Template generator script
 ├── quick-start.sh           # One-liner setup helper
 ├── demo-shop/               # E-commerce demo app
