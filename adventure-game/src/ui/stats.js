@@ -11,10 +11,14 @@ export class StatsScreen {
 
   render() {
     const gameState = this.context.session.gameState;
-    const allRooms = this.gameModel.getAllRooms();
-    const totalRooms = allRooms.length;
+    const contentTop = 4;
+    const footerHeight = 3;
+    const availableHeight = Math.max(10, this.screen.height - contentTop - footerHeight);
+    const progressHeight = Math.max(6, Math.min(9, Math.floor(availableHeight * 0.45)));
+    const lowerTop = contentTop + progressHeight;
+    const lowerHeight = Math.max(4, availableHeight - progressHeight);
 
-    const header = UIComponents.createBox({
+    UIComponents.createBox({
       parent: this.screen,
       top: 0,
       left: 0,
@@ -24,7 +28,7 @@ export class StatsScreen {
       tags: true
     });
 
-    if (!gameState) {
+    if (!gameState?.worldState) {
       UIComponents.createBox({
         parent: this.screen,
         top: 4,
@@ -32,120 +36,78 @@ export class StatsScreen {
         width: '96%',
         height: 5,
         content: '\n  No game in progress. Start a new adventure first!',
-        style: {
-          border: { fg: 'red' }
-        }
+        style: { border: { fg: 'red' } }
       });
-    } else if (gameState.llmEnabled) {
-      // LLM mode stats
-      const exchanges = Math.floor((gameState.messageHistory.length - 1) / 2);
-
-      UIComponents.createBox({
-        parent: this.screen,
-        top: 4,
-        left: 0,
-        width: '100%',
-        height: 7,
-        label: ' Progress ',
-        content: `
-  {bold}Mode:{/}              LLM (AI Game Master)
-  {bold}Turns Taken:{/}       ${gameState.moves}
-  {bold}Items Collected:{/}   ${gameState.inventory.length}
-  {bold}Conversations:{/}     ${exchanges} exchanges`,
-        tags: true,
-        style: {
-          border: { fg: 'yellow' }
-        }
-      });
-
-      const invText = gameState.inventory.length > 0
-        ? gameState.inventory.map(i => `  ${i}`).join('\n')
-        : '  Empty';
-
-      UIComponents.createBox({
-        parent: this.screen,
-        top: 12,
-        left: 0,
-        width: '100%',
-        height: Math.max(gameState.inventory.length + 2, 5),
-        label: ' Inventory ',
-        content: `\n${invText}`,
-        tags: true,
-        style: {
-          border: { fg: 'green' }
-        }
-      });
-    } else {
-      // Static mode stats
-      const visitedCount = gameState.visitedRooms.size;
-      const totalItems = allRooms.reduce((sum, r) => sum + r.items.length, 0);
-      const collectedItems = gameState.inventory.length;
-      const progressPct = Math.round(((visitedCount + collectedItems) / (totalRooms + totalItems)) * 100);
-
-      UIComponents.createBox({
-        parent: this.screen,
-        top: 4,
-        left: 0,
-        width: '100%',
-        height: 8,
-        label: ' Progress ',
-        content: `
-  {bold}Mode:{/}              Offline (Static)
-  {bold}Moves Made:{/}        ${gameState.moves}
-  {bold}Rooms Explored:{/}    ${visitedCount} / ${totalRooms}
-  {bold}Items Collected:{/}   ${collectedItems} / ${totalItems}
-  {bold}Completion:{/}        ${progressPct}%
-  {bold}Current Location:{/}  ${this.gameModel.getRoom(gameState.currentRoom).name}`,
-        tags: true,
-        style: {
-          border: { fg: 'yellow' }
-        }
-      });
-
-      const visitedList = Array.from(gameState.visitedRooms).map(id => {
-        const room = this.gameModel.getRoom(id);
-        return `  ${room.name}`;
-      }).join('\n');
-
-      const unvisitedList = allRooms
-        .filter(r => !gameState.visitedRooms.has(r.id))
-        .map(r => `  {gray-fg}${r.name} (unexplored){/}`)
-        .join('\n');
-
-      UIComponents.createBox({
-        parent: this.screen,
-        top: 13,
-        left: 0,
-        width: '50%',
-        height: totalRooms + 3,
-        label: ' Rooms ',
-        content: `\n${visitedList}${unvisitedList ? '\n' + unvisitedList : ''}`,
-        tags: true,
-        style: {
-          border: { fg: 'cyan' }
-        }
-      });
-
-      const invText = gameState.inventory.length > 0
-        ? gameState.inventory.map(i => `  ${i}`).join('\n')
-        : '  Empty';
-
-      UIComponents.createBox({
-        parent: this.screen,
-        top: 13,
-        right: 0,
-        width: '50%',
-        height: totalRooms + 3,
-        label: ' Inventory ',
-        content: `\n${invText}`,
-        tags: true,
-        style: {
-          border: { fg: 'green' }
-        }
-      });
+      this.renderFooter();
+      return;
     }
 
-    // Footer
+    const currentRoom = this.gameModel.getRoom(gameState.currentRoom);
+    const director = gameState.worldState.director;
+    const checks = gameState.worldState.metrics.checks;
+    const checksTotal = checks.passed + checks.partial + checks.failed;
+    const actionCounts = gameState.worldState.metrics.actionCounts;
+    const questStats = Object.values(gameState.worldState.quests);
+    const completedQuests = questStats.filter((quest) => quest.status === 'completed').length;
+
+    UIComponents.createBox({
+      parent: this.screen,
+      top: contentTop,
+      left: 0,
+      width: '100%',
+      height: progressHeight,
+      label: ' Progress ',
+      content: `
+  {bold}Health:{/}            ${gameState.player.health} / ${gameState.player.maxHealth}
+  {bold}Turns Taken:{/}       ${gameState.moves}
+  {bold}Location:{/}          ${currentRoom?.name || gameState.currentRoom}
+  {bold}Items Collected:{/}   ${gameState.inventory.length}
+  {bold}Quests Completed:{/}  ${completedQuests} / ${questStats.length}
+  {bold}Director:{/}          ${director.style} (${director.lastBeat})
+  {bold}Tension:{/}           ${director.tension}  |  {bold}Phase:{/} ${gameState.worldState.time.phase}`,
+      tags: true,
+      style: { border: { fg: 'yellow' } }
+    });
+
+    UIComponents.createBox({
+      parent: this.screen,
+      top: lowerTop,
+      left: 0,
+      width: '50%',
+      height: lowerHeight,
+      label: ' Skill & Combat ',
+      content: `
+  Total: ${checksTotal}
+  Passed: ${checks.passed}
+  Partial: ${checks.partial}
+  Failed: ${checks.failed}
+
+  Combat Wins: ${gameState.worldState.metrics.combatVictories}
+  Damage Dealt: ${gameState.worldState.metrics.damageDealt}
+  Damage Taken: ${gameState.worldState.metrics.damageTaken}`,
+      style: { border: { fg: 'cyan' } }
+    });
+
+    const actionProfile = Object.entries(actionCounts)
+      .filter(([, count]) => count > 0)
+      .map(([key, count]) => `  ${key}: ${count}`)
+      .join('\n');
+
+    UIComponents.createBox({
+      parent: this.screen,
+      top: lowerTop,
+      right: 0,
+      width: '50%',
+      height: lowerHeight,
+      label: ' Action Profile ',
+      content: `\n${actionProfile || '  No actions recorded yet.'}`,
+      style: { border: { fg: 'magenta' } }
+    });
+
+    this.renderFooter();
+  }
+
+  renderFooter() {
     UIComponents.createBox({
       parent: this.screen,
       bottom: 0,
@@ -157,24 +119,6 @@ export class StatsScreen {
       style: { fg: 'white' }
     });
 
-    const backBtn = UIComponents.createButton({
-      parent: this.screen,
-      bottom: 3,
-      left: 'center',
-      width: 15,
-      height: 3,
-      content: ' Back ',
-      name: 'back'
-    });
-
-    backBtn.on('press', () => {
-      this.context.navigate('game');
-    });
-
-    this.screen.key(['b', 'escape'], () => {
-      this.context.navigate('game');
-    });
-
-    backBtn.focus();
+    this.screen.key(['b', 'escape'], () => this.context.navigate('game'));
   }
 }

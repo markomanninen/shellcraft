@@ -52,14 +52,19 @@ src/
 
 ## Quick Start
 
+If your shell does not auto-load Node/npm, use the local wrapper:
+```bash
+./npmw --version
+```
+
 1. **Install dependencies**:
    ```bash
-   npm install
+   ./npmw install
    ```
 
 2. **Generate SSH host keys**:
    ```bash
-   npm run generate-keys
+   ./npmw run generate-keys
    ```
 
 3. **Create environment file**:
@@ -69,7 +74,7 @@ src/
 
 4. **Start the server**:
    ```bash
-   npm start
+   ./npmw start
    ```
 
 5. **Connect via SSH**:
@@ -144,13 +149,13 @@ Logs shown on the Logs screen are simulated (randomly generated mock entries).
 
 ```bash
 # Run all tests
-npm test
+./npmw test
 
 # Unit tests only
-npm run test:unit
+./npmw run test:unit
 
 # End-to-end tests only
-npm run test:e2e
+./npmw run test:e2e
 ```
 
 Tests use the Node.js built-in test runner (`node --test`). Test files are located in:
@@ -172,7 +177,7 @@ test/
 Run with auto-reload:
 
 ```bash
-npm run dev
+./npmw run dev
 ```
 
 This uses nodemon to restart the server when source files change.

@@ -31,14 +31,19 @@ src/
 
 ## 🚀 Quick Start
 
+If your shell does not auto-load Node/npm, use the local wrapper:
+```bash
+./npmw --version
+```
+
 1. **Install dependencies**:
    ```bash
-   npm install
+   ./npmw install
    ```
 
 2. **Generate SSH host keys**:
    ```bash
-   npm run generate-keys
+   ./npmw run generate-keys
    ```
 
 3. **Create environment file**:
@@ -48,7 +53,7 @@ src/
 
 4. **Start the server**:
    ```bash
-   npm start
+   ./npmw start
    ```
 
 5. **Connect via SSH**:
@@ -176,7 +181,7 @@ this.context.exit();
 Run with auto-reload:
 
 ```bash
-npm run dev
+./npmw run dev
 ```
 
 ## 🌐 API Integration
@@ -196,7 +201,7 @@ async fetchProducts() {
 Add database support (example with SQLite):
 
 ```bash
-npm install better-sqlite3
+./npmw install better-sqlite3
 ```
 
 ```javascript

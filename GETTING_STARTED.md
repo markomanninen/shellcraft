@@ -6,6 +6,11 @@
 - npm (`npm --version`)
 - SSH client (built-in on macOS/Linux; `ssh -V`)
 
+## Command Convention (Repo Demos)
+
+For demo apps inside this repository, use `./npmw ...` in each app directory.
+It auto-loads `nvm` if your shell does not expose `node`/`npm` on PATH.
+
 ## Step 1: Make init.sh Executable
 
 ```bash
@@ -22,6 +27,9 @@ chmod +x init.sh
 The first argument is the project name, the second is the app type (`ecommerce` or `minimal`).
 
 ## Step 3: Install and Run
+
+If `npm` is not available in your shell, run:
+`source ~/.nvm/nvm.sh && nvm use default`
 
 ```bash
 cd my-app
@@ -49,10 +57,10 @@ Each demo is a self-contained app inside the repo. They all follow the same setu
 
 ```bash
 cd <app-directory>
-npm install
-npm run generate-keys
+./npmw install
+./npmw run generate-keys
 cp .env.example .env
-npm start
+./npmw start
 # then in another terminal: ssh localhost -p 2222
 ```
 
@@ -61,7 +69,7 @@ npm start
 E-commerce storefront. Browse products, add to cart, checkout. This is the same template that `./init.sh my-app` generates.
 
 ```bash
-cd demo-shop && npm install && npm run generate-keys && npm start
+cd demo-shop && ./npmw install && ./npmw run generate-keys && ./npmw start
 ```
 
 ### adventure-game
@@ -69,7 +77,7 @@ cd demo-shop && npm install && npm run generate-keys && npm start
 Text adventure with LLM-powered dynamic descriptions. Requires Ollama running locally for LLM mode -- without it the game falls back to static room descriptions (fully playable, just not dynamic). Configure `OLLAMA_BASE_URL` and `OLLAMA_MODEL` in `.env`.
 
 ```bash
-cd adventure-game && npm install && npm run generate-keys && npm start
+cd adventure-game && ./npmw install && ./npmw run generate-keys && ./npmw start
 ```
 
 Keyboard shortcuts once connected: `h` = help/menu, `i` = inventory, `q` = quit, arrow keys to move between rooms.
@@ -79,7 +87,7 @@ Keyboard shortcuts once connected: `h` = help/menu, `i` = inventory, `q` = quit,
 Server monitoring dashboard with system stats, process list, and log viewer.
 
 ```bash
-cd admin-dashboard && npm install && npm run generate-keys && npm start
+cd admin-dashboard && ./npmw install && ./npmw run generate-keys && ./npmw start
 ```
 
 ### animation-demo
@@ -87,7 +95,7 @@ cd admin-dashboard && npm install && npm run generate-keys && npm start
 Standalone ASCII animation showcase (runs directly in the terminal, no SSH):
 
 ```bash
-cd animation-demo && npm install && npm start
+cd animation-demo && ./npmw install && ./npmw start
 ```
 
 ---

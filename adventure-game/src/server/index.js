@@ -1,16 +1,27 @@
 import fs from 'fs';
 import path from 'path';
 import ssh2 from 'ssh2';
-import dotenv from 'dotenv';
+import { runtimeConfig } from '../config/runtime-config.js';
 
 const { Server } = ssh2;
 import { CommandRouter } from './router.js';
 import { SessionManager } from './session.js';
 
-dotenv.config();
+const PORT = runtimeConfig.server.port;
+const HOST = runtimeConfig.server.host;
 
-const PORT = process.env.SSH_PORT || 2222;
-const HOST_KEY = fs.readFileSync(process.env.HOST_KEY_PATH || './keys/host_key');
+function resolveHostKeyPath(hostKeyPath) {
+  if (path.isAbsolute(hostKeyPath)) {
+    return hostKeyPath;
+  }
+  return path.resolve(process.cwd(), hostKeyPath);
+}
+
+const resolvedHostKeyPath = resolveHostKeyPath(runtimeConfig.server.hostKeyPath);
+if (!fs.existsSync(resolvedHostKeyPath)) {
+  throw new Error(`[startup] Host key not found at "${resolvedHostKeyPath}"`);
+}
+const HOST_KEY = fs.readFileSync(resolvedHostKeyPath);
 
 class TerminalServer {
   constructor() {
@@ -70,8 +81,8 @@ class TerminalServer {
   }
 
   start() {
-    this.server.listen(PORT, '0.0.0.0', () => {
-      console.log(`Terminal server listening on port ${PORT}`);
+    this.server.listen(PORT, HOST, () => {
+      console.log(`Terminal server listening on ${HOST}:${PORT}`);
       console.log(`Connect with: ssh localhost -p ${PORT}`);
     });
   }

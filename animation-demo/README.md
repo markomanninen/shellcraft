@@ -17,8 +17,8 @@ A standalone terminal animation viewer built with [blessed](https://github.com/c
 ## Quick Start
 
 ```bash
-npm install
-npm start
+./npmw install
+./npmw start
 ```
 
 ## Controls

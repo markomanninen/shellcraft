@@ -1,80 +1,160 @@
 import { UIComponents } from './components.js';
-import { GameModel } from '../models/game.js';
 import { LLMGameEngine } from '../llm/game-engine.js';
+import { RulesEngine } from '../models/rules-engine.js';
+import { normalizeGameState } from '../models/game-state.js';
+import { GAME_CONFIG } from '../config/game-config.js';
 import { wizardAnimation } from './loading-animation.js';
+
+export function validateRenderableResponse(response) {
+  if (!response || typeof response !== 'object') {
+    throw new Error('[room] Invalid cached response: expected object');
+  }
+
+  if (!Array.isArray(response.items_here) || !Array.isArray(response.actions)) {
+    throw new Error('[room] Invalid cached response: "items_here" and "actions" must be arrays');
+  }
+
+  if (typeof response.room_name !== 'string' || typeof response.description !== 'string') {
+    throw new Error('[room] Invalid cached response: missing room metadata');
+  }
+
+  if (response.actions.length === 0) {
+    throw new Error('[room] Invalid cached response: "actions" must not be empty');
+  }
+
+  if (typeof response.message !== 'string') {
+    throw new Error('[room] Invalid cached response: "message" must be a string');
+  }
+
+  if (!response.director || typeof response.director !== 'object') {
+    throw new Error('[room] Invalid cached response: missing "director"');
+  }
+
+  if (typeof response.director.style !== 'string' || typeof response.director.lastBeat !== 'string') {
+    throw new Error('[room] Invalid cached response: invalid "director" payload');
+  }
+
+  if (!Number.isFinite(response.director.tension)) {
+    throw new Error('[room] Invalid cached response: "director.tension" must be numeric');
+  }
+
+  if (typeof response.phase !== 'string' || !GAME_CONFIG.gameplay.timePhases.includes(response.phase)) {
+    throw new Error('[room] Invalid cached response: invalid "phase"');
+  }
+
+  if (!response.player || typeof response.player !== 'object') {
+    throw new Error('[room] Invalid cached response: missing "player"');
+  }
+
+  if (!Number.isFinite(response.player.health) || !Number.isFinite(response.player.maxHealth)) {
+    throw new Error('[room] Invalid cached response: invalid "player" payload');
+  }
+
+  if (response.active_encounter !== null && response.active_encounter !== undefined) {
+    if (typeof response.active_encounter !== 'object') {
+      throw new Error('[room] Invalid cached response: "active_encounter" must be object or null');
+    }
+    if (
+      typeof response.active_encounter.name !== 'string' ||
+      !Number.isFinite(response.active_encounter.currentHp) ||
+      !Number.isFinite(response.active_encounter.maxHp)
+    ) {
+      throw new Error('[room] Invalid cached response: invalid "active_encounter" payload');
+    }
+  }
+
+  return response;
+}
+
+export function buildMeterBar(value, max, width = 18) {
+  if (!Number.isFinite(value) || !Number.isFinite(max) || max <= 0 || width < 1) {
+    throw new Error('[room] Invalid meter values');
+  }
+
+  const clamped = Math.min(Math.max(value, 0), max);
+  const filled = Math.round((clamped / max) * width);
+  return `${'='.repeat(filled)}${'-'.repeat(width - filled)}`;
+}
+
+export function classifyAction(action) {
+  if (typeof action !== 'string' || !action.trim()) {
+    return 'ACTION';
+  }
+
+  const text = action.toLowerCase();
+  if (text.includes('back to menu')) return 'SYSTEM';
+  if (text.includes('game master')) return 'CUSTOM';
+
+  if (/(^go\b|north|south|east|west|travel|retreat|enter|leave|return)/.test(text)) return 'MOVE';
+  if (/(attack|strike|fight|combat|defend|slay|guardian|sentinel|wolf)/.test(text)) return 'COMBAT';
+  if (/(talk|speak|ask|persuade|negotiate|elder|ranger|keeper)/.test(text)) return 'SOCIAL';
+  if (/(look|investigate|inspect|search|examine|scout|read)/.test(text)) return 'LOOK';
+  if (/(take|pick|grab|loot|collect|recover|claim|use)/.test(text)) return 'USE';
+
+  return 'ACTION';
+}
+
+function buildActionLabel(action, index) {
+  const slot = String(index + 1).padStart(2, ' ');
+  const tag = classifyAction(action).padEnd(6, ' ');
+  return `${slot}. [${tag}] ${action}`;
+}
 
 export class RoomScreen {
   constructor(context) {
     this.context = context;
     this.screen = context.screen;
-    this.gameModel = new GameModel();
     this.llmEngine = new LLMGameEngine();
+    this.rulesEngine = new RulesEngine();
     this.alive = true;
     this.loadingInterval = null;
+
+    this.context.session.gameState = normalizeGameState(this.context.session.gameState);
     this.render();
   }
 
   render() {
     const gameState = this.context.session.gameState;
 
-    // If we have a pre-fetched LLM response, render it directly
+    if (gameState.pendingError) {
+      const error = gameState.pendingError;
+      delete gameState.pendingError;
+      this.renderError(error);
+      return;
+    }
+
     if (gameState.pendingResponse) {
-      const resp = gameState.pendingResponse;
+      const pendingResponse = gameState.pendingResponse;
       delete gameState.pendingResponse;
-      // Save as last response for resume
-      gameState.lastResponse = resp;
-      this.renderRoom(
-        resp.room_name,
-        resp.description,
-        resp.items_here.length > 0
-          ? `Visible: ${resp.items_here.join(', ')}`
-          : 'No items visible',
-        resp.actions,
-        gameState,
-        null,
-        resp.message
-      );
-    } else if (gameState.llmEnabled && gameState.pendingAction) {
-      // Only call LLM when there's an action to process (or first turn)
+      try {
+        const response = validateRenderableResponse(pendingResponse);
+        gameState.lastResponse = response;
+        this.renderRoom(response, gameState);
+      } catch (error) {
+        delete gameState.lastResponse;
+        this.context.saveGame();
+        this.renderError(error);
+      }
+      return;
+    }
+
+    if (gameState.pendingTurn || gameState.pendingAction || gameState.isFirstTurn || !gameState.lastResponse) {
       this.renderLoading();
-      this.fetchLLMResponse(gameState);
-    } else if (gameState.llmEnabled && gameState.isFirstTurn) {
-      this.renderLoading();
-      this.fetchLLMResponse(gameState);
-    } else if (gameState.llmEnabled && gameState.lastResponse) {
-      // Resume: re-render the last LLM response without a new call
-      const resp = gameState.lastResponse;
-      this.renderRoom(
-        resp.room_name,
-        resp.description,
-        resp.items_here.length > 0
-          ? `Visible: ${resp.items_here.join(', ')}`
-          : 'No items visible',
-        resp.actions,
-        gameState,
-        null,
-        resp.message
-      );
-    } else if (gameState.llmEnabled) {
-      // Fallback: no last response cached, need to ask LLM
-      this.renderLoading();
-      this.fetchLLMResponse(gameState);
-    } else {
-      const room = this.gameModel.getRoom(gameState.currentRoom);
-      this.renderRoom(
-        room.name,
-        room.description,
-        `Items here: ${room.items.length > 0 ? room.items.join(', ') : 'none'}`,
-        this.getStaticActions(room),
-        gameState,
-        room,
-        null
-      );
+      this.fetchTurnNarration(gameState);
+      return;
+    }
+
+    try {
+      const resumeResponse = validateRenderableResponse(gameState.lastResponse);
+      this.renderRoom(resumeResponse, gameState);
+    } catch (error) {
+      delete gameState.lastResponse;
+      this.context.saveGame();
+      this.renderError(error);
     }
   }
 
   renderLoading() {
-    // Wizard animation box
     const { frames, interval, color } = wizardAnimation;
     const frameHeight = frames[0].length;
     const frameWidth = frames[0][0].length;
@@ -85,9 +165,8 @@ export class RoomScreen {
       left: 'center',
       width: frameWidth + 4,
       height: frameHeight + 2,
-      label: ' The Wizard is thinking... ',
+      label: ' Resolving Turn ',
       tags: true,
-      border: { type: 'line' },
       style: { border: { fg: color } },
       align: 'center',
       valign: 'middle'
@@ -97,7 +176,7 @@ export class RoomScreen {
     const renderFrame = () => {
       if (!this.alive) return;
       const frame = frames[frameIndex];
-      const content = frame.map(line => `{${color}-fg}${line}{/}`).join('\n');
+      const content = frame.map((line) => `{${color}-fg}${line}{/}`).join('\n');
       animBox.setContent(content);
       this.screen.render();
       frameIndex = (frameIndex + 1) % frames.length;
@@ -118,160 +197,199 @@ export class RoomScreen {
     });
 
     this.screen.key(['h'], () => {
-      this.alive = false;
-      if (this.loadingInterval) {
-        clearInterval(this.loadingInterval);
-        this.loadingInterval = null;
-      }
+      this.cleanupLoading();
       this.context.navigate('game');
     });
 
     this.screen.render();
   }
 
-  async fetchLLMResponse(gameState) {
+  cleanupLoading() {
+    this.alive = false;
+    if (this.loadingInterval) {
+      clearInterval(this.loadingInterval);
+      this.loadingInterval = null;
+    }
+  }
+
+  async fetchTurnNarration(gameState) {
     try {
-      let result;
-      if (gameState.isFirstTurn) {
-        result = await this.llmEngine.startGame();
-        gameState.isFirstTurn = false;
-      } else {
-        result = await this.llmEngine.processAction(
-          gameState.pendingAction,
-          gameState.messageHistory,
-          gameState.inventory
-        );
+      if (!gameState.pendingTurn) {
+        const action = gameState.isFirstTurn
+          ? '__start__'
+          : (gameState.pendingAction || GAME_CONFIG.gameplay.genericActions[0]);
+        const turn = this.rulesEngine.resolveTurn(gameState, action);
+        gameState.pendingTurn = turn;
         delete gameState.pendingAction;
+        this.context.saveGame();
       }
 
+      const narration = await this.llmEngine.narrateTurn(gameState.pendingTurn, gameState.messageHistory);
       if (!this.alive) return;
 
-      gameState.messageHistory = result.messages;
+      gameState.messageHistory = narration.messages;
+      const turn = gameState.pendingTurn;
+      const combinedMessage = `${turn.outcome.message} ${narration.response.message}`.trim();
+      const response = {
+        room_name: turn.room.name,
+        description: narration.response.description,
+        items_here: turn.itemsHere,
+        actions: turn.actions,
+        message: combinedMessage,
+        game_over: turn.gameOver,
+        director: turn.director,
+        phase: turn.phase,
+        player: turn.player,
+        active_encounter: turn.activeEncounter,
+        action_outcome: turn.outcome.status,
+        deterministic_message: turn.outcome.message
+      };
 
-      const update = result.response.inventory_update;
-      if (update.add) {
-        update.add.forEach(item => {
-          if (!gameState.inventory.includes(item)) {
-            gameState.inventory.push(item);
-          }
-        });
-      }
-      if (update.remove) {
-        gameState.inventory = gameState.inventory.filter(
-          item => !update.remove.includes(item)
-        );
-      }
+      delete gameState.pendingTurn;
+      gameState.lastTurn = turn;
+      gameState.lastResponse = response;
+      gameState.pendingResponse = response;
 
-      gameState.moves++;
-      this.context.saveGame();
-
-      if (this.loadingInterval) {
-        clearInterval(this.loadingInterval);
-        this.loadingInterval = null;
-      }
-
-      if (!this.alive) return;
-
-      if (result.response.game_over) {
-        gameState.pendingResponse = result.response;
+      if (response.game_over) {
         gameState.pendingResponse._gameOver = true;
-        this.context.navigate('room');
-        return;
       }
 
-      // Store response and re-navigate through the router for clean screen state
-      gameState.lastResponse = result.response;
-      gameState.pendingResponse = result.response;
+      this.context.saveGame();
+      this.cleanupLoading();
       this.context.navigate('room');
-
     } catch (error) {
       if (!this.alive) return;
-      if (this.loadingInterval) {
-        clearInterval(this.loadingInterval);
-        this.loadingInterval = null;
-      }
+      this.cleanupLoading();
       gameState.pendingError = error;
       this.context.navigate('room');
     }
   }
 
-  renderRoom(roomName, description, itemsText, actionItems, gameState, staticRoom, message) {
-    // Check for game over
-    if (gameState.pendingResponse && gameState.pendingResponse._gameOver) {
-      const resp = gameState.pendingResponse;
-      delete gameState.pendingResponse;
-      this.renderGameOver(resp);
+  renderRoom(response, gameState) {
+    if (response._gameOver) {
+      this.renderGameOver(response);
       return;
     }
 
-    // Check for error
-    if (gameState.pendingError) {
-      const error = gameState.pendingError;
-      delete gameState.pendingError;
-      this.renderError(error, gameState);
-      return;
-    }
+    const hpBar = buildMeterBar(response.player.health, response.player.maxHealth);
+    const tensionMax = GAME_CONFIG.systems.pacing.maxTension;
+    const tensionBar = buildMeterBar(response.director.tension, tensionMax);
+    const activeQuest = Object.values(gameState.worldState.quests)
+      .find((quest) => quest.status === 'active');
+    const objectiveText = activeQuest
+      ? `${activeQuest.title} (${Math.round(activeQuest.progress)}%)`
+      : 'No active objective';
+    const itemsText = response.items_here.length > 0
+      ? `Visible: ${response.items_here.join(', ')}`
+      : 'Visible: none';
+    const encounterText = response.active_encounter
+      ? `Threat: ${response.active_encounter.name} (${response.active_encounter.currentHp}/${response.active_encounter.maxHp} HP)`
+      : 'Threat: none';
+    const roomMeta = `Phase: ${response.phase} | Style: ${response.director.style} | Beat: ${response.director.lastBeat}`;
+    const footerHeight = 4;
+    const topHeight = Math.max(9, Math.min(13, Math.floor(this.screen.height * 0.45)));
+    const lowerHeight = Math.max(7, this.screen.height - topHeight - footerHeight);
+    const rawMessage = response.message || '';
+    const displayMessage = rawMessage.length > 260
+      ? `${rawMessage.slice(0, 257)}...`
+      : rawMessage;
+    const msgLineWidth = Math.max(30, Math.floor(this.screen.width * 0.62) - 10);
+    const messageHeight = displayMessage
+      ? Math.min(Math.ceil(displayMessage.length / msgLineWidth) + 2, 5)
+      : 0;
+    const rightPaneTop = topHeight;
+    const leftPaneTop = topHeight + messageHeight;
+    const actionsHeight = Math.max(4, lowerHeight - messageHeight);
 
-    // Room description
     UIComponents.createBox({
       parent: this.screen,
       top: 0,
       left: 0,
-      width: '100%',
-      height: 7,
-      label: ` ${roomName} `,
-      content: `\n  ${description}\n\n  ${itemsText}`,
+      width: '64%',
+      height: topHeight,
+      label: ` ${response.room_name} `,
+      content: `\n  ${response.description}\n\n  ${roomMeta}`,
       tags: true,
       style: { border: { fg: 'yellow' } }
     });
 
-    // Message box (LLM feedback about last action)
-    let messageOffset = 0;
-    if (message) {
-      const msgLines = Math.ceil(message.length / 74) + 2;
+    UIComponents.createBox({
+      parent: this.screen,
+      top: 0,
+      left: '64%',
+      width: '36%',
+      height: topHeight,
+      label: ' Tactical Telemetry ',
+      content: `
+  HP      [${hpBar}] ${response.player.health}/${response.player.maxHealth}
+  Tension [${tensionBar}] ${response.director.tension}/${tensionMax}
+
+  ${encounterText}
+  Objective:
+  ${objectiveText}`,
+      style: { border: { fg: 'cyan' } }
+    });
+
+    if (displayMessage) {
       UIComponents.createBox({
         parent: this.screen,
-        top: 8,
+        top: topHeight,
         left: 0,
-        width: '100%',
-        height: msgLines,
-        content: `  {green-fg}${message}{/}`,
+        width: '64%',
+        height: messageHeight,
+        label: ' Outcome ',
+        content: `  {green-fg}${displayMessage}{/}`,
         tags: true,
         style: { border: { fg: 'green' } }
       });
-      messageOffset = msgLines + 1;
     }
 
-    // Inventory
     const invText = gameState.inventory.length > 0
       ? gameState.inventory.join(', ')
       : 'Empty';
+    const invDisplay = invText.length > 180 ? `${invText.slice(0, 177)}...` : invText;
 
     UIComponents.createBox({
       parent: this.screen,
-      top: 8 + messageOffset,
-      left: 0,
-      width: '100%',
-      height: 3,
-      label: ' Inventory ',
-      content: `  ${invText}`,
-      tags: true,
+      top: rightPaneTop,
+      left: '64%',
+      width: '36%',
+      height: lowerHeight,
+      label: ' Field Notes ',
+      content: `
+  ${itemsText}
+
+  Inventory:
+  ${invDisplay}
+
+  Turn: ${gameState.moves}
+  Last Outcome: ${response.action_outcome || 'n/a'}`,
       style: { border: { fg: 'green' } }
     });
 
-    // Actions menu
-    const extraActions = staticRoom ? [] : ['Ask the Game Master...'];
-    const allActions = [...actionItems, ...extraActions, 'Back to menu'];
+    const allActions = [
+      ...response.actions,
+      GAME_CONFIG.gameplay.freeTextLabel,
+      GAME_CONFIG.gameplay.backToMenuLabel
+    ];
+    const actionItems = allActions.map((action, index) => buildActionLabel(action, index));
+
     const actions = UIComponents.createList({
       parent: this.screen,
-      top: 12 + messageOffset,
+      top: leftPaneTop,
       left: 0,
-      width: '100%',
-      height: allActions.length + 2,
-      label: ' Actions ',
-      items: allActions,
+      width: '64%',
+      height: actionsHeight,
+      label: ' Tactical Actions ',
+      items: actionItems,
       keys: false,
       vi: false,
+      scrollable: true,
+      alwaysScroll: true,
+      scrollbar: {
+        ch: ' ',
+        style: { bg: 'magenta' }
+      },
       style: {
         border: { fg: 'magenta' },
         selected: { bg: 'blue', fg: 'white' },
@@ -285,29 +403,30 @@ export class RoomScreen {
       const action = allActions[index];
       if (!action) return;
 
-      if (action === 'Back to menu') {
+      if (action === GAME_CONFIG.gameplay.backToMenuLabel) {
         this.context.navigate('game');
-      } else if (action === 'Ask the Game Master...') {
-        this.showTextInput(actions, gameState);
-      } else if (staticRoom) {
-        this.handleStaticAction(action, staticRoom, gameState);
-      } else {
-        gameState.pendingAction = action;
-        this.context.navigate('room');
+        return;
       }
+
+      if (action === GAME_CONFIG.gameplay.freeTextLabel) {
+        this.showTextInput(actions, gameState);
+        return;
+      }
+
+      gameState.pendingAction = action;
+      this.context.navigate('room');
     };
 
     actions.on('select', (_item, index) => handleSelect(index));
 
-    // Footer
     const isEditing = () => this.screen.focused?.type === 'textbox';
     UIComponents.createBox({
       parent: this.screen,
       bottom: 0,
       left: 0,
       width: '100%',
-      height: 3,
-      content: `{center}Moves: ${gameState.moves} | Items: ${gameState.inventory.length}{/}\n{center}{gray-fg}h=menu | i=inventory | q=quit{/}`,
+      height: footerHeight,
+      content: `{center}Turn ${gameState.moves} | HP ${response.player.health}/${response.player.maxHealth} | Tension ${response.director.tension}/${tensionMax}{/}\n{center}{gray-fg}1-9=quick action | Enter=select | h=menu | i=inventory | j=journal | q=quit{/}`,
       tags: true,
       style: { fg: 'white' }
     });
@@ -320,8 +439,11 @@ export class RoomScreen {
       if (isEditing()) return;
       this.context.navigate('inventory');
     });
+    this.screen.key(['j'], () => {
+      if (isEditing()) return;
+      this.context.navigate('journal');
+    });
 
-    // Explicit arrow/enter key routing (blessed focus workaround)
     this.screen.key(['up'], () => {
       if (isEditing() || !menuActive) return;
       actions.up();
@@ -336,8 +458,16 @@ export class RoomScreen {
       if (isEditing() || !menuActive) return;
       handleSelect(actions.selected);
     });
+    this.screen.key(['1', '2', '3', '4', '5', '6', '7', '8', '9'], (_ch, key) => {
+      if (isEditing() || !menuActive) return;
+      const index = Number(key.name) - 1;
+      if (Number.isInteger(index) && index >= 0 && index < allActions.length) {
+        actions.select(index);
+        this.screen.render();
+        handleSelect(index);
+      }
+    });
 
-    // Deferred activation + focus
     setTimeout(() => {
       menuActive = true;
       actions.select(0);
@@ -353,7 +483,7 @@ export class RoomScreen {
       left: 'center',
       width: '70%',
       height: 3,
-      label: ' Ask the Game Master (Esc=cancel) ',
+      label: ' Enter Action (Esc=cancel) ',
       style: { border: { fg: 'yellow' } }
     });
 
@@ -363,10 +493,10 @@ export class RoomScreen {
       if (text) {
         gameState.pendingAction = text;
         this.context.navigate('room');
-      } else {
-        actionsList.focus();
-        this.screen.render();
+        return;
       }
+      actionsList.focus();
+      this.screen.render();
     });
 
     inputBox.on('cancel', () => {
@@ -379,15 +509,16 @@ export class RoomScreen {
     this.screen.render();
   }
 
-  renderError(error, gameState) {
+  renderError(error) {
+    const message = (error.message || 'Unknown error').slice(0, 120);
     UIComponents.createBox({
       parent: this.screen,
       top: 'center',
       left: 'center',
-      width: '70%',
-      height: 9,
-      label: ' Connection Error ',
-      content: `\n  {red-fg}Could not reach the game master.{/}\n\n  ${(error.message || 'Unknown error').substring(0, 60)}\n\n  {gray-fg}r=retry | f=offline mode | h=menu{/}`,
+      width: '75%',
+      height: 10,
+      label: ' Turn Failed ',
+      content: `\n  {red-fg}Turn narration failed.{/}\n\n  ${message}\n\n  {gray-fg}r=retry narration | h=menu{/}`,
       tags: true,
       style: { border: { fg: 'red' } }
     });
@@ -395,13 +526,9 @@ export class RoomScreen {
     this.screen.key(['r'], () => {
       this.context.navigate('room');
     });
-    this.screen.key(['f'], () => {
-      gameState.llmEnabled = false;
-      gameState.currentRoom = 'start';
-      this.context.navigate('room');
+    this.screen.key(['h'], () => {
+      this.context.navigate('game');
     });
-    this.screen.key(['h'], () => this.context.navigate('game'));
-
     this.screen.render();
   }
 
@@ -410,51 +537,15 @@ export class RoomScreen {
       parent: this.screen,
       top: 'center',
       left: 'center',
-      width: '70%',
-      height: 9,
+      width: '75%',
+      height: 10,
       label: ` ${response.room_name} `,
-      content: `\n  ${response.description}\n\n  {bold}{yellow-fg}GAME OVER - VICTORY!{/}\n\n  {gray-fg}Press Enter to return to menu{/}`,
+      content: `\n  ${response.description}\n\n  {bold}{yellow-fg}VICTORY - QUEST COMPLETE{/}\n\n  {gray-fg}Press Enter to return to menu{/}`,
       tags: true,
       style: { border: { fg: 'yellow' } }
     });
 
     this.screen.key(['enter'], () => this.context.navigate('game'));
     this.screen.render();
-  }
-
-  // --- Static fallback (original behavior) ---
-
-  getStaticActions(room) {
-    const actions = [];
-    Object.keys(room.exits).forEach(dir => actions.push(`Go ${dir}`));
-    room.items.forEach(item => actions.push(`Take ${item}`));
-    actions.push('Look around');
-    return actions;
-  }
-
-  handleStaticAction(action, room, gameState) {
-    if (action.startsWith('Go ')) {
-      const direction = action.split(' ')[1];
-      const nextRoomId = room.exits[direction];
-      if (nextRoomId) {
-        gameState.currentRoom = nextRoomId;
-        gameState.visitedRooms.add(nextRoomId);
-        gameState.moves++;
-        this.context.saveGame();
-        this.context.navigate('room');
-      }
-    } else if (action.startsWith('Take ')) {
-      const item = action.split(' ')[1];
-      const index = room.items.indexOf(item);
-      if (index > -1) {
-        room.items.splice(index, 1);
-        gameState.inventory.push(item);
-        this.context.saveGame();
-        UIComponents.showMessage(this.screen, `Picked up: ${item}`, 'success');
-        setTimeout(() => this.context.navigate('room'), 1500);
-      }
-    } else if (action.includes('Look around')) {
-      UIComponents.showMessage(this.screen, 'You examine your surroundings carefully...', 'info');
-    }
   }
 }

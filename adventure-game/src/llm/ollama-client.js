@@ -1,12 +1,12 @@
-const DEFAULT_BASE_URL = 'http://localhost:11434';
-const DEFAULT_MODEL = 'qwen3-coder:30b';
-const DEFAULT_TIMEOUT_MS = 60000;
+import { GAME_CONFIG } from '../config/game-config.js';
+import { runtimeConfig } from '../config/runtime-config.js';
 
 export class OllamaClient {
   constructor(options = {}) {
-    this.baseUrl = options.baseUrl || process.env.OLLAMA_BASE_URL || DEFAULT_BASE_URL;
-    this.model = options.model || process.env.OLLAMA_MODEL || DEFAULT_MODEL;
-    this.timeoutMs = options.timeoutMs || DEFAULT_TIMEOUT_MS;
+    this.baseUrl = options.baseUrl ?? runtimeConfig.llm.baseUrl;
+    this.model = options.model ?? runtimeConfig.llm.model;
+    this.timeoutMs = options.timeoutMs ?? runtimeConfig.llm.timeoutMs;
+    this.healthTimeoutMs = options.healthTimeoutMs ?? runtimeConfig.llm.healthTimeoutMs;
   }
 
   async chat(messages, options = {}) {
@@ -24,8 +24,8 @@ export class OllamaClient {
           format: 'json',
           think: false,
           options: {
-            temperature: options.temperature ?? 0.8,
-            num_predict: options.maxTokens ?? 1024,
+            temperature: options.temperature ?? GAME_CONFIG.llm.chatOptions.temperature,
+            num_predict: options.maxTokens ?? GAME_CONFIG.llm.chatOptions.maxTokens
           }
         }),
         signal: controller.signal
@@ -45,7 +45,7 @@ export class OllamaClient {
   async isAvailable() {
     try {
       const response = await fetch(`${this.baseUrl}/api/tags`, {
-        signal: AbortSignal.timeout(3000)
+        signal: AbortSignal.timeout(this.healthTimeoutMs)
       });
       return response.ok;
     } catch {

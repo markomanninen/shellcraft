@@ -1,28 +1,41 @@
-import { describe, it } from 'node:test';
+import { describe, it, beforeEach, afterEach } from 'node:test';
 import { strict as assert } from 'assert';
+import os from 'os';
+import fs from 'fs';
+import path from 'path';
 import { SessionManager } from '../../src/server/session.js';
 
 describe('SessionManager', () => {
-  it('should create a session', () => {
-    const manager = new SessionManager();
-    const session = manager.createSession('testuser');
+  let tempDir;
+  let sessionsFile;
+  let manager;
 
-    assert.ok(session, 'Should create session');
-    assert.ok(session.id, 'Session should have id');
-    assert.strictEqual(session.username, 'testuser');
-    assert.ok(session.createdAt, 'Session should have createdAt');
-    assert.ok(Array.isArray(session.cart), 'Session should have cart array');
+  beforeEach(() => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'adventure-session-unit-'));
+    sessionsFile = path.join(tempDir, 'sessions.json');
+    manager = new SessionManager({ sessionsFile });
   });
 
-  it('should create guest session without username', () => {
-    const manager = new SessionManager();
-    const session = manager.createSession(null);
+  afterEach(() => {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
 
+  it('creates a session', () => {
+    const session = manager.createSession('testuser');
+
+    assert.ok(session);
+    assert.ok(session.id);
+    assert.strictEqual(session.username, 'testuser');
+    assert.ok(session.createdAt);
+    assert.ok(Array.isArray(session.cart));
+  });
+
+  it('creates guest session without username', () => {
+    const session = manager.createSession(null);
     assert.strictEqual(session.username, 'guest');
   });
 
-  it('should reuse session for same username', () => {
-    const manager = new SessionManager();
+  it('reuses session for same username', () => {
     const session1 = manager.createSession('player1');
     session1.gameState = { test: true };
     const session2 = manager.createSession('player1');
@@ -31,26 +44,20 @@ describe('SessionManager', () => {
     assert.deepStrictEqual(session2.gameState, { test: true });
   });
 
-  it('should retrieve existing session', () => {
-    const manager = new SessionManager();
+  it('retrieves existing session', () => {
     const session = manager.createSession('testuser');
     const retrieved = manager.getSession(session.id);
-
     assert.deepStrictEqual(retrieved, session);
   });
 
-  it('should destroy session', () => {
-    const manager = new SessionManager();
+  it('destroys session', () => {
     const session = manager.createSession('testuser');
-
     manager.destroySession(session.id);
     const retrieved = manager.getSession(session.id);
-
     assert.strictEqual(retrieved, undefined);
   });
 
-  it('should maintain separate session carts', () => {
-    const manager = new SessionManager();
+  it('maintains separate session carts', () => {
     const session1 = manager.createSession('user1');
     const session2 = manager.createSession('user2');
 

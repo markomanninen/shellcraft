@@ -33,6 +33,12 @@ A production-ready template for creating SSH-based terminal applications with be
 
 ## 🚀 Quick Start
 
+### Command Convention (Repo Demos)
+
+For demo apps in this repository, use `./npmw ...` from the app directory.
+The wrapper auto-loads `nvm` when `node`/`npm` are missing from PATH.
+For generated apps, use plain `npm ...` commands (or load nvm first).
+
 ### 1. Create a New Project
 
 ```bash

@@ -1,14 +1,16 @@
 import { describe, it } from 'node:test';
 import { strict as assert } from 'assert';
 import { OllamaClient } from '../../src/llm/ollama-client.js';
+import { runtimeConfig } from '../../src/config/runtime-config.js';
 
 describe('OllamaClient', () => {
   describe('configuration', () => {
     it('should use default configuration', () => {
       const client = new OllamaClient();
-      assert.strictEqual(client.baseUrl, 'http://localhost:11434');
-      assert.strictEqual(client.model, 'qwen3-coder:30b');
-      assert.strictEqual(client.timeoutMs, 60000);
+      assert.strictEqual(client.baseUrl, runtimeConfig.llm.baseUrl);
+      assert.strictEqual(client.model, runtimeConfig.llm.model);
+      assert.strictEqual(client.timeoutMs, runtimeConfig.llm.timeoutMs);
+      assert.strictEqual(client.healthTimeoutMs, runtimeConfig.llm.healthTimeoutMs);
     });
 
     it('should accept custom configuration via constructor', () => {
@@ -24,9 +26,9 @@ describe('OllamaClient', () => {
 
     it('should fall back to defaults for partial config', () => {
       const client = new OllamaClient({ model: 'custom-model' });
-      assert.strictEqual(client.baseUrl, 'http://localhost:11434');
+      assert.strictEqual(client.baseUrl, runtimeConfig.llm.baseUrl);
       assert.strictEqual(client.model, 'custom-model');
-      assert.strictEqual(client.timeoutMs, 60000);
+      assert.strictEqual(client.timeoutMs, runtimeConfig.llm.timeoutMs);
     });
   });
 

@@ -229,7 +229,7 @@ Welcome to the Terminal App Template! This index will guide you to the right doc
 ## 🚀 Quick Links
 
 - **Generate App**: `./init.sh my-app`
-- **Example App**: `cd demo-shop && npm start`
+- **Example App**: `cd demo-shop && ./npmw start`
 - **Connect**: `ssh localhost -p 2222`
 
 ## 📞 Getting Help

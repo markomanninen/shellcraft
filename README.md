@@ -49,7 +49,7 @@ Features include:
 - Resume and continue support -- reconnect and pick up where you left off
 - Free-text input to the Game Master alongside suggested actions
 - Animated wizard loading screen while the LLM responds
-- Offline fallback mode with static room descriptions
+- Deterministic simulation + strict narration contract (fast-fail on invalid LLM payloads)
 
 ### admin-dashboard -- System Monitoring
 
@@ -60,6 +60,17 @@ A server monitoring dashboard with screens for system overview, running processe
 A standalone ASCII animation showcase. Displays multiple frame-based animations with speed control, pause/play, and keyboard navigation. Useful as a reference for building loading screens and visual effects.
 
 ## Quick Start
+
+### Command Convention
+
+For apps that live inside this repository (`demo-shop`, `adventure-game`, `admin-dashboard`, `animation-demo`), use the local npm wrapper:
+
+```bash
+./npmw <command>
+```
+
+This wrapper auto-loads `nvm` if your shell PATH does not include `node`/`npm`.
+Plain `npm ...` commands still work when `node`/`npm` are already available in PATH.
 
 ### Generate a New App
 
@@ -78,6 +89,8 @@ chmod +x init.sh
 
 ### Run a Generated App
 
+For generated apps, use plain `npm ...` commands (or load nvm first if `npm` is missing).
+
 ```bash
 cd my-app
 npm install
@@ -89,9 +102,9 @@ npm start
 
 ```bash
 cd demo-shop          # or adventure-game, admin-dashboard
-npm install
-npm run generate-keys
-npm start
+./npmw install
+./npmw run generate-keys
+./npmw start
 ```
 
 ### Connect
@@ -216,7 +229,7 @@ this.screens = {
 ### Local Development
 
 ```bash
-npm run dev  # Uses nodemon for auto-reload
+./npmw run dev  # Uses nodemon for auto-reload
 ```
 
 ### Production (PM2)
@@ -247,6 +260,9 @@ docker run -p 2222:2222 my-app
 ```
 
 Then connect: `ssh localhost -p 2222`
+
+If `npm` is not found in your shell, load nvm first:
+`source ~/.nvm/nvm.sh && nvm use default`.
 
 ## License
 

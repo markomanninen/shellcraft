@@ -1,185 +1,143 @@
 # Terminal Adventure
 
-An SSH-accessible text adventure game powered by an LLM Game Master. Connect via any SSH client, explore a fantasy world with AI-generated scenes, or play offline with a static 6-room map. Game progress is saved per SSH username and survives server restarts.
+SSH-accessible terminal RPG with a deterministic simulation core and LLM narration layer.
 
-## Features
+## What Changed (Phase 1-3)
 
-- **LLM-Powered Game Master** -- Ollama generates room descriptions, actions, and inventory changes in structured JSON. The static game world (6 rooms) seeds the system prompt, but the LLM can expand beyond it.
-- **Static Fallback** -- Works without Ollama. Six hardcoded rooms (Village Square, Dark Forest, Mysterious Cave, Peaceful Meadow, Ancient Temple, Treasure Chamber) with directional movement and item pickup.
-- **Session Persistence** -- Game state saved to `data/sessions.json`, keyed by SSH username. Reconnecting resumes exactly where you left off.
-- **Resume Support** -- "Continue Adventure" re-renders the last LLM response without making a new API call.
-- **Free-Text Input** -- "Ask the Game Master..." lets you type any action. The LLM interprets your intent and responds.
-- **Animated Loading** -- A wizard ASCII animation plays while waiting for the LLM to respond.
-- **Error Recovery** -- If Ollama is unreachable, a connection error screen offers retry (`r`), offline/static mode (`f`), or return to menu (`h`).
-- **Open Authentication** -- Accepts any SSH connection without password or key verification. The SSH `username` is used as the session key.
+- Phase 1:
+  - Structured, deterministic rules engine for actions and world state transitions.
+  - Quest system with journal-backed progression.
+- Phase 2:
+  - Skill checks (`combat`, `lore`, `stealth`, `charisma`, `perception`).
+  - Deterministic combat encounters with room-linked enemies and drops.
+  - Faction reputation and persistent NPC memory/trust.
+- Phase 3:
+  - Pacing director (tension + beats).
+  - Adaptive narrative style (`balanced`, `grim`, `heroic`, `mystic`).
+  - Balancing metrics (action profile, checks, inventory peak, quest completions).
+  - UI refresh: campaign snapshot panel, split-pane room HUD, categorized tactical actions, 1-9 quick actions, and animated screen transitions.
+
+## Core Principles
+
+- Centralized configuration:
+  - `src/config/game-config.js`
+  - `src/config/runtime-config.js`
+- Single source of truth:
+  - world rooms, quests, NPCs, systems, and runtime defaults all live in config.
+- Fast fail:
+  - invalid runtime config throws on startup.
+  - invalid LLM JSON contract throws (no silent fallback payloads).
+- LLM is narration-only:
+  - game logic is resolved by deterministic code before LLM call.
 
 ## Architecture
 
-```
+```text
 src/
-├── server/
-│   ├── index.js              # SSH server entry point (accepts any auth, captures username)
-│   ├── router.js             # Screen navigation with full cleanup between transitions
-│   └── session.js            # Username-based sessions with JSON file persistence
-├── ui/
-│   ├── components.js         # Reusable blessed UI components (box, list, table, form, input, button, message)
-│   ├── game.js               # Main menu (Start New / Continue Adventure, Inventory, Stats, Help, Exit)
-│   ├── room.js               # Room display, LLM integration, static fallback, error handling
-│   ├── inventory.js          # Inventory screen (table of collected items)
-│   ├── help.js               # Help screen (controls, gameplay tips)
-│   ├── stats.js              # Game statistics (LLM mode: turns, items, exchanges; static mode: rooms, completion %)
-│   └── loading-animation.js  # Wizard ASCII art animation frames (4 frames, 500ms interval)
+├── config/
+│   ├── game-config.js        # world + gameplay + systems source of truth
+│   └── runtime-config.js     # env parsing/validation (fast-fail)
 ├── models/
-│   └── game.js               # Static game world definition (6 rooms with exits and items, world seed text)
-└── llm/
-    ├── ollama-client.js      # Ollama API wrapper (chat, health check, configurable timeout)
-    └── game-engine.js        # System prompt builder, message history management, JSON response parsing
+│   ├── game.js               # static world read model
+│   ├── game-state.js         # initial state + runtime state normalization
+│   └── rules-engine.js       # deterministic action parsing + state patching
+├── llm/
+│   ├── ollama-client.js      # typed Ollama client using runtime config
+│   └── game-engine.js        # narration-only prompt + strict JSON validation
+├── ui/
+│   ├── game.js               # menu
+│   ├── room.js               # turn loop: resolve -> narrate -> render
+│   ├── journal.js            # quests, factions, npc memory
+│   ├── stats.js              # pacing + check + action metrics
+│   ├── inventory.js
+│   ├── help.js
+│   ├── components.js
+│   └── loading-animation.js
+└── server/
+    ├── index.js              # SSH server bootstrap (validated config)
+    ├── router.js             # screen navigation
+    └── session.js            # persisted session + runtime state hydration
 ```
 
 ## Quick Start
 
-1. **Install dependencies:**
+If your shell does not load `nvm` automatically, use the local wrapper:
+```bash
+./npmw --version
+```
 
-   ```bash
-   npm install
-   ```
+1. Install dependencies:
+```bash
+./npmw install
+```
 
-2. **Generate SSH host keys:**
+2. Generate SSH host keys:
+```bash
+./npmw run generate-keys
+```
 
-   ```bash
-   npm run generate-keys
-   ```
+3. Create env file:
+```bash
+cp .env.example .env
+```
 
-3. **Create environment file:**
+4. Start server:
+```bash
+./npmw start
+```
 
-   ```bash
-   cp .env.example .env
-   ```
+If a previous process is still bound to the configured SSH port, restart cleanly:
+```bash
+./npmw run restart
+```
 
-4. **Start the server:**
+`npm run restart` is equivalent when `npm` is already on your PATH.
 
-   ```bash
-   npm start
-   ```
-
-5. **Connect via SSH:**
-
-   ```bash
-   ssh localhost -p 2222
-   ```
-
-   The username you connect with becomes your session key. Reconnecting with the same username resumes your game.
-
-### With Ollama (Recommended)
-
-If you have [Ollama](https://ollama.com) running locally with a model pulled, the game uses it as the Game Master. The default model is `qwen3-coder:30b`. To use a different model, set `OLLAMA_MODEL` in your `.env` file.
-
-### Without Ollama
-
-The game works without Ollama. If the LLM is unreachable on first turn, you will see a connection error screen where you can press `f` to switch to offline mode with the static 6-room map.
+5. Connect:
+```bash
+ssh localhost -p 2222
+```
 
 ## Environment Variables
 
 | Variable | Default | Description |
 |---|---|---|
-| `SSH_PORT` | `2222` | Port the SSH server listens on |
-| `HOST_KEY_PATH` | `./keys/host_key` | Path to the SSH host key file |
-| `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama API base URL |
-| `OLLAMA_MODEL` | `qwen3-coder:30b` | Model name for Ollama chat completions |
-
-## npm Scripts
-
-| Script | Command | Description |
-|---|---|---|
-| `start` | `node src/server/index.js` | Start the SSH server |
-| `restart` | kills port 2222, then starts | Kill any existing process on port 2222 and start fresh |
-| `dev` | `nodemon src/server/index.js` | Start with auto-reload on file changes |
-| `generate-keys` | `node scripts/generate-keys.js` | Generate SSH host key pair into `./keys/` |
-| `test` | `test:unit && test:e2e` | Run all tests |
-| `test:unit` | `node --test test/unit/**/*.test.js` | Run unit tests |
-| `test:e2e` | `node --test test/e2e/**/*.test.js` | Run end-to-end tests |
-| `test:watch` | `node --test --watch` | Run tests in watch mode |
-
-## Session Data
-
-Sessions are stored in `data/sessions.json`. Each entry contains:
-
-```
-id              - Unique session identifier (nanoid)
-username        - SSH login name (session key)
-createdAt       - Session creation timestamp
-lastConnected   - Last connection timestamp
-gameState       - Game progress (null until a game is started):
-  currentRoom     - Current room ID (e.g., "start")
-  inventory       - Array of collected item names
-  visitedRooms    - Set of visited room IDs
-  moves           - Number of turns taken
-  messageHistory  - Full LLM conversation history (system + user + assistant messages)
-  llmEnabled      - Whether LLM mode is active (false = static fallback)
-  isFirstTurn     - Whether the next LLM call should be the opening scene
-  lastResponse    - Cached last LLM response (used for resume without re-calling)
-```
-
-Sessions with no `gameState` (never started a game) are not persisted to disk.
+| `SSH_PORT` | `2222` | SSH server port |
+| `SSH_HOST` | `0.0.0.0` | SSH bind host |
+| `HOST_KEY_PATH` | `./keys/host_key` | SSH host key path |
+| `SESSIONS_FILE_PATH` | `./data/sessions.json` | Session persistence file path |
+| `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama base URL |
+| `OLLAMA_MODEL` | `qwen3-coder:30b` | Ollama model |
+| `OLLAMA_TIMEOUT_MS` | `60000` | chat timeout |
+| `OLLAMA_HEALTH_TIMEOUT_MS` | `3000` | health-check timeout |
 
 ## Controls
 
 | Key | Context | Action |
 |---|---|---|
-| Up / Down | Menus | Navigate options |
-| Enter | Menus | Select option |
-| `h` | Room screen | Return to main menu |
-| `i` | Room screen | Open inventory |
-| `b` / Escape | Inventory, Stats, Help | Go back |
-| `r` | Error screen | Retry LLM connection |
-| `f` | Error screen | Switch to offline/static mode |
-| `q` / Ctrl+C | Anywhere (except text input) | Quit |
+| Up / Down | Menus | Navigate |
+| Enter | Menus | Select |
+| `1-9` | Menus + Room actions | Quick-select indexed options |
+| `h` | Room | Main menu |
+| `i` | Room | Inventory |
+| `j` | Room | Journal |
+| `r` | Error | Retry narration |
+| `b` / Escape | Secondary screens | Back |
+| `q` / Ctrl+C | Global (except text input) | Quit |
 
-## LLM Integration
+## Scripts
 
-The Game Master prompt instructs the LLM to respond with structured JSON:
+| Script | Command | Description |
+|---|---|---|
+| `npmw` | `./npmw <args>` | npm wrapper that auto-loads `nvm` when needed |
+| `start` | `node src/server/index.js` | Start server |
+| `restart` | `node scripts/restart-server.js && node src/server/index.js` | Clear configured SSH port and start server |
+| `dev` | `nodemon src/server/index.js` | Auto-reload server |
+| `generate-keys` | `node scripts/generate-keys.js` | Generate host keys |
+| `test:unit` | `node --test test/unit/*.test.js` | Unit tests |
+| `test:e2e` | `node --test test/e2e/*.test.js` | End-to-end tests |
+| `test` | `./npmw run test:unit && ./npmw run test:e2e` | Full test suite |
 
-```json
-{
-  "room_name": "Current location name",
-  "description": "Scene description (2-4 short sentences, max 200 chars)",
-  "items_here": ["visible items"],
-  "actions": ["4-6 possible actions"],
-  "inventory_update": { "add": ["gained items"], "remove": ["lost items"] },
-  "game_over": false,
-  "message": "Feedback about the last action"
-}
-```
+## Development Loop
 
-Key behaviors:
-
-- The system prompt includes the static world definition as a seed, but the LLM may expand beyond it.
-- Message history is trimmed to the last 40 messages (plus the system prompt) to stay within context limits.
-- If JSON parsing fails, a graceful fallback response is returned ("The game master lost focus. Try again.").
-- The Ollama client enforces a 60-second timeout per request.
-- Requests use `format: "json"` and `think: false` for direct structured output.
-
-## Static Game World
-
-Used as the LLM seed and as the offline fallback map:
-
-| Room | ID | Items | Exits |
-|---|---|---|---|
-| Village Square | `start` | torch, map | north, east, south |
-| Dark Forest | `forest` | sword, shield | south, east |
-| Mysterious Cave | `cave` | potion | west, north |
-| Peaceful Meadow | `meadow` | flower, herbs | north |
-| Ancient Temple | `temple` | amulet | west |
-| Treasure Chamber | `treasure` | gold, crown, jewels | south |
-
-## Dependencies
-
-- **ssh2** -- SSH server implementation
-- **blessed** -- Terminal UI framework
-- **dotenv** -- Environment variable loading
-- **nanoid** -- Session ID generation
-- **nodemon** (dev) -- File watcher for auto-reload
-
-## License
-
-MIT
+See `DEV_LOOP.md` for the incremental implementation/test process used for Phases 1-3.

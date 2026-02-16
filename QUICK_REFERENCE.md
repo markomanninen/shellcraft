@@ -2,6 +2,9 @@
 
 ## Getting Started
 
+For demo apps inside this repository, prefer `./npmw ...` in the app directory.
+For generated apps, use plain `npm ...` commands (or load nvm first if `npm` is missing).
+
 ```bash
 # Create new app (ecommerce template by default)
 ./init.sh my-app
@@ -320,13 +323,13 @@ element.focus()  // Ensure focus
 ## NPM Scripts
 
 ```bash
-npm start              # Start server
-npm run dev            # Dev with auto-reload
-npm run generate-keys  # Generate SSH keys
-npm test               # Run all tests
-npm run test:unit      # Unit tests only
-npm run test:e2e       # E2E tests only
-npm restart            # Kill port 2222 and restart (adventure-game only)
+./npmw start              # Start server
+./npmw run dev            # Dev with auto-reload
+./npmw run generate-keys  # Generate SSH keys
+./npmw test               # Run all tests
+./npmw run test:unit      # Unit tests only
+./npmw run test:e2e       # E2E tests only
+./npmw run restart        # Clear configured SSH_PORT and restart (adventure-game only)
 ```
 
 ## Environment Variables
@@ -360,4 +363,4 @@ OLLAMA_MODEL=qwen3-coder:30b            # LLM model for dynamic descriptions
 
 ---
 
-**Quick start: `./init.sh my-app && cd my-app && npm i && npm run generate-keys && npm start`**
+**Quick start (repo demos): `cd demo-shop && ./npmw install && ./npmw run generate-keys && ./npmw start`**

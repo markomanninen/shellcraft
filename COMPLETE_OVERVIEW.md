@@ -23,7 +23,7 @@ A single bash script (~1,633 lines) that generates a complete terminal app with:
 E-commerce terminal app with product catalog, shopping cart, checkout form, and session-based shopping.
 
 ```bash
-cd demo-shop && npm install && npm run generate-keys && npm start
+cd demo-shop && ./npmw install && ./npmw run generate-keys && ./npmw start
 # Then: ssh localhost -p 2222
 ```
 
@@ -36,7 +36,7 @@ Text-based dungeon crawler with LLM integration via Ollama. Features include:
 - Resume support -- reconnecting SSH users continue where they left off
 
 ```bash
-cd adventure-game && npm install && npm run generate-keys && npm start
+cd adventure-game && ./npmw install && ./npmw run generate-keys && ./npmw start
 # Then: ssh localhost -p 2222
 ```
 
@@ -44,7 +44,7 @@ cd adventure-game && npm install && npm run generate-keys && npm start
 Real-time system monitoring dashboard showing CPU, memory, process list, system logs, network info, and services. Reads live data from the host OS.
 
 ```bash
-cd admin-dashboard && npm install && npm run generate-keys && npm start
+cd admin-dashboard && ./npmw install && ./npmw run generate-keys && ./npmw start
 # Then: ssh localhost -p 2222
 ```
 
@@ -52,7 +52,7 @@ cd admin-dashboard && npm install && npm run generate-keys && npm start
 Standalone blessed terminal animation viewer. Displays various ASCII art animations directly in the terminal without an SSH server.
 
 ```bash
-cd animation-demo && npm install && node index.js
+cd animation-demo && ./npmw install && ./npmw start
 ```
 
 ### 3. Testing Infrastructure
@@ -67,10 +67,10 @@ test/
 ```
 
 ```bash
-npm test            # Run all tests
-npm run test:unit   # Unit tests only
-npm run test:e2e    # E2E tests only
-npm run test:watch  # Watch mode
+./npmw test            # Run all tests
+./npmw run test:unit   # Unit tests only
+./npmw run test:e2e    # E2E tests only
+./npmw run test:watch  # Watch mode
 ```
 
 Tests cover: data models, session creation and isolation, SSH server connections, user workflows, LLM engine logic, and cart/inventory operations.
@@ -98,6 +98,10 @@ Each app also has its own `README.md`.
 ## Quick Start
 
 ### Generate a new app from the template
+
+If `npm` is not available in your shell, run:
+`source ~/.nvm/nvm.sh && nvm use default`
+
 ```bash
 chmod +x init.sh
 ./init.sh my-app-name
@@ -111,7 +115,7 @@ npm start
 
 ### Try an existing demo
 ```bash
-cd demo-shop && npm i && npm run generate-keys && npm test && npm start
+cd demo-shop && ./npmw install && ./npmw run generate-keys && ./npmw test && ./npmw start
 ```
 
 ---

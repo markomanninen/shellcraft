@@ -1,14 +1,22 @@
 import { nanoid } from 'nanoid';
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
+import { normalizeGameState } from '../models/game-state.js';
+import { runtimeConfig } from '../config/runtime-config.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DATA_DIR = path.join(__dirname, '..', '..', 'data');
-const SESSIONS_FILE = path.join(DATA_DIR, 'sessions.json');
+function resolveSessionsFile(filePath) {
+  if (path.isAbsolute(filePath)) {
+    return filePath;
+  }
+  return path.resolve(process.cwd(), filePath);
+}
 
 export class SessionManager {
-  constructor() {
+  constructor(options = {}) {
+    this.sessionsFile = resolveSessionsFile(
+      options.sessionsFile ?? runtimeConfig.storage.sessionsFile
+    );
+    this.dataDir = path.dirname(this.sessionsFile);
     this.sessions = new Map();
     this.usernameIndex = new Map(); // username → session id
     this._load();
@@ -16,15 +24,15 @@ export class SessionManager {
 
   _load() {
     try {
-      if (!fs.existsSync(SESSIONS_FILE)) {
+      if (!fs.existsSync(this.sessionsFile)) {
         console.log('[session] No sessions file found, starting fresh');
         return;
       }
-      const raw = JSON.parse(fs.readFileSync(SESSIONS_FILE, 'utf8'));
-      console.log(`[session] Reading ${SESSIONS_FILE} — ${raw.length} entry(ies)`);
+      const raw = JSON.parse(fs.readFileSync(this.sessionsFile, 'utf8'));
+      console.log(`[session] Reading ${this.sessionsFile} — ${raw.length} entry(ies)`);
       for (const entry of raw) {
-        if (entry.gameState?.visitedRooms) {
-          entry.gameState.visitedRooms = new Set(entry.gameState.visitedRooms);
+        if (entry.gameState) {
+          entry.gameState = normalizeGameState(entry.gameState);
         }
         if (entry.createdAt) entry.createdAt = new Date(entry.createdAt);
         if (entry.lastConnected) entry.lastConnected = new Date(entry.lastConnected);
@@ -42,8 +50,8 @@ export class SessionManager {
 
   _save() {
     try {
-      if (!fs.existsSync(DATA_DIR)) {
-        fs.mkdirSync(DATA_DIR, { recursive: true });
+      if (!fs.existsSync(this.dataDir)) {
+        fs.mkdirSync(this.dataDir, { recursive: true });
       }
       const entries = [];
       for (const session of this.sessions.values()) {
@@ -56,8 +64,8 @@ export class SessionManager {
         }
         entries.push(clone);
       }
-      fs.writeFileSync(SESSIONS_FILE, JSON.stringify(entries, null, 2));
-      console.log(`[session] Saved ${entries.length} session(s) to ${SESSIONS_FILE}`);
+      fs.writeFileSync(this.sessionsFile, JSON.stringify(entries, null, 2));
+      console.log(`[session] Saved ${entries.length} session(s) to ${this.sessionsFile}`);
     } catch (err) {
       console.error('[session] Failed to save sessions:', err.message);
     }

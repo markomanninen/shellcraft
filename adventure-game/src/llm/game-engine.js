@@ -1,7 +1,13 @@
 import { OllamaClient } from './ollama-client.js';
 import { GameModel } from '../models/game.js';
+import { GAME_CONFIG } from '../config/game-config.js';
 
-const MAX_HISTORY_MESSAGES = 40;
+export class LLMResponseValidationError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = 'LLMResponseValidationError';
+  }
+}
 
 export class LLMGameEngine {
   constructor() {
@@ -12,106 +18,108 @@ export class LLMGameEngine {
   buildSystemPrompt() {
     const worldSeed = this.gameModel.getWorldSeedText();
 
-    return `You are the Game Master for a fantasy text adventure game.
+    return `You are the narrative director for a fantasy text adventure game.
 
-WORLD SEED (reference locations, you may expand beyond these):
+WORLD SEED (fixed locations):
 ${worldSeed}
 
 RULES:
 1. Respond ONLY with valid JSON matching this schema:
 {
-  "room_name": "string - current location name",
-  "description": "string - scene description, 2-4 SHORT sentences, max 200 chars",
-  "items_here": ["visible items in this location"],
-  "actions": ["exactly 4-6 possible actions"],
-  "inventory_update": {"add": ["items gained"], "remove": ["items lost"]},
-  "game_over": false,
-  "message": "string or null - feedback about the last action"
+  "description": "string - 2 to 4 concise sentences",
+  "message": "string - one-line feedback for the chosen action"
 }
 
-2. Keep descriptions CONCISE. The display is a small terminal (80x24 chars).
-3. Always provide exactly 4-6 actions. Include movement, interaction, and investigation options.
-4. The last action should be a way to retreat or go back.
-5. INVENTORY IS CRITICAL: When the player takes, picks up, or receives an item, you MUST add it to inventory_update.add. When they use, drop, or lose an item, you MUST add it to inventory_update.remove. Never forget inventory changes.
-6. Create a coherent, connected world. Remember previous events.
-7. If a locked door exists, it stays locked until the player finds a key.
-8. Never break character. Never include text outside the JSON.
-9. When the player reaches the treasure with enough items, set game_over to true and give a victory description.
-10. The player may type free-form text instead of choosing an action. Interpret their intent and respond appropriately.`;
+2. Do not invent game logic; rules resolution is deterministic and already provided.
+3. Tone must match director_style and current_beat in the turn payload.
+4. Never include text outside JSON.`;
   }
 
-  async startGame() {
-    const systemMessage = { role: 'system', content: this.buildSystemPrompt() };
+  async narrateTurn(turnResult, messageHistory) {
+    const preparedHistory = this.prepareHistory(messageHistory);
     const userMessage = {
       role: 'user',
-      content: 'I begin my adventure. I am standing in the village square. Describe what I see and give me my options.'
+      content: JSON.stringify({
+        turn: turnResult.turn,
+        phase: turnResult.phase,
+        room: turnResult.room,
+        items_here: turnResult.itemsHere,
+        action_type: turnResult.action.type,
+        action_text: turnResult.action.raw,
+        outcome: turnResult.outcome.status,
+        deterministic_message: turnResult.outcome.message,
+        available_actions: turnResult.actions,
+        player: turnResult.player,
+        active_encounter: turnResult.activeEncounter,
+        director_style: turnResult.director.style,
+        current_beat: turnResult.director.lastBeat,
+        tension: turnResult.director.tension,
+        game_over: turnResult.gameOver
+      })
     };
 
-    const messages = [systemMessage, userMessage];
-    const result = await this.client.chat(messages);
-    const parsed = this.parseResponse(result.message.content);
+    preparedHistory.push(userMessage);
 
-    const fullHistory = [
-      ...messages,
-      { role: 'assistant', content: result.message.content }
-    ];
+    const result = await this.client.chat(preparedHistory);
+    const parsed = this.parseNarrationResponse(result.message.content);
 
-    return { response: parsed, messages: fullHistory };
+    preparedHistory.push({ role: 'assistant', content: result.message.content });
+
+    return { response: parsed, messages: preparedHistory };
   }
 
-  async processAction(action, messageHistory, currentInventory) {
-    const userMessage = {
-      role: 'user',
-      content: `My inventory: [${currentInventory.join(', ')}]. I choose: "${action}". Remember to update inventory_update if items change.`
-    };
-
-    const trimmedHistory = this.trimHistory(messageHistory);
-    trimmedHistory.push(userMessage);
-
-    const result = await this.client.chat(trimmedHistory);
-    const parsed = this.parseResponse(result.message.content);
-
-    trimmedHistory.push({ role: 'assistant', content: result.message.content });
-
-    return { response: parsed, messages: trimmedHistory };
-  }
-
-  parseResponse(content) {
+  parseNarrationResponse(content) {
+    let parsed;
     try {
-      const parsed = JSON.parse(content);
-      return {
-        room_name: parsed.room_name || 'Unknown Location',
-        description: parsed.description || 'You look around but cannot make sense of your surroundings.',
-        items_here: Array.isArray(parsed.items_here) ? parsed.items_here : [],
-        actions: Array.isArray(parsed.actions) && parsed.actions.length > 0
-          ? parsed.actions
-          : ['Look around', 'Wait', 'Go back'],
-        inventory_update: {
-          add: Array.isArray(parsed.inventory_update?.add) ? parsed.inventory_update.add : [],
-          remove: Array.isArray(parsed.inventory_update?.remove) ? parsed.inventory_update.remove : []
-        },
-        game_over: !!parsed.game_over,
-        message: parsed.message || null
-      };
+      parsed = JSON.parse(content);
     } catch {
-      return {
-        room_name: 'Mysterious Place',
-        description: 'The world shimmers and reforms around you...',
-        items_here: [],
-        actions: ['Look around', 'Try to focus', 'Go back the way you came'],
-        inventory_update: { add: [], remove: [] },
-        game_over: false,
-        message: '(The game master lost focus. Try again.)'
-      };
+      throw new LLMResponseValidationError('[llm] Model response was not valid JSON');
     }
+
+    for (const key of GAME_CONFIG.llm.requiredNarrationKeys) {
+      if (!(key in parsed)) {
+        throw new LLMResponseValidationError(`[llm] Missing required response key "${key}"`);
+      }
+    }
+
+    if (typeof parsed.description !== 'string' || !parsed.description.trim()) {
+      throw new LLMResponseValidationError('[llm] "description" must be a non-empty string');
+    }
+
+    if (parsed.description.length > GAME_CONFIG.llm.descriptionMaxChars) {
+      throw new LLMResponseValidationError(
+        `[llm] "description" exceeds ${GAME_CONFIG.llm.descriptionMaxChars} chars`
+      );
+    }
+
+    if (typeof parsed.message !== 'string' || !parsed.message.trim()) {
+      throw new LLMResponseValidationError('[llm] "message" must be a non-empty string');
+    }
+
+    return {
+      description: parsed.description.trim(),
+      message: parsed.message.trim()
+    };
+  }
+
+  prepareHistory(messages) {
+    if (!Array.isArray(messages) || messages.length === 0) {
+      return [{ role: 'system', content: this.buildSystemPrompt() }];
+    }
+
+    if (messages[0].role !== 'system') {
+      throw new Error('[llm] Message history must start with a system prompt');
+    }
+
+    return this.trimHistory(messages);
   }
 
   trimHistory(messages) {
-    if (messages.length <= MAX_HISTORY_MESSAGES + 1) {
+    if (messages.length <= GAME_CONFIG.llm.maxHistoryMessages + 1) {
       return [...messages];
     }
     const systemPrompt = messages[0];
-    const recentMessages = messages.slice(-MAX_HISTORY_MESSAGES);
+    const recentMessages = messages.slice(-GAME_CONFIG.llm.maxHistoryMessages);
     return [systemPrompt, ...recentMessages];
   }
 

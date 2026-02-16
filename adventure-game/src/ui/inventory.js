@@ -8,7 +8,11 @@ export class InventoryScreen {
   }
 
   render() {
-    const header = UIComponents.createBox({
+    const contentTop = 4;
+    const footerHeight = 3;
+    const contentHeight = Math.max(8, this.screen.height - contentTop - footerHeight);
+
+    UIComponents.createBox({
       parent: this.screen,
       top: 0,
       left: 0,
@@ -21,48 +25,46 @@ export class InventoryScreen {
     const gameState = this.context.session.gameState;
 
     if (!gameState || gameState.inventory.length === 0) {
-      const emptyMsg = UIComponents.createBox({
+      UIComponents.createBox({
         parent: this.screen,
-        top: 'center',
+        top: contentTop,
         left: 'center',
         width: '60%',
-        height: 5,
+        height: contentHeight,
+        label: ' Your Items ',
         content: '{center}{yellow-fg}Your inventory is empty!{/}\n{center}Explore and collect items.',
-        tags: true
+        tags: true,
+        valign: 'middle'
       });
     } else {
       const table = UIComponents.createTable({
         parent: this.screen,
-        top: 4,
+        top: contentTop,
         left: 'center',
         width: '80%',
-        height: '70%',
+        height: contentHeight,
         label: ' Your Items ',
         data: [
           ['#', 'Item'],
           ...gameState.inventory.map((item, i) => [(i+1).toString(), item])
         ]
       });
+
+      table.focus();
     }
 
-    const backBtn = UIComponents.createButton({
+    UIComponents.createBox({
       parent: this.screen,
-      bottom: 3,
-      left: 'center',
-      width: 15,
+      bottom: 0,
+      left: 0,
+      width: '100%',
       height: 3,
-      content: ' Back ',
-      name: 'back'
-    });
-
-    backBtn.on('press', () => {
-      this.context.navigate('game');
+      content: '{center}{gray-fg}b=back | q=quit{/}',
+      tags: true
     });
 
     this.screen.key(['b', 'escape'], () => {
       this.context.navigate('game');
     });
-
-    backBtn.focus();
   }
 }
