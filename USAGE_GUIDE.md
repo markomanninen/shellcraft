@@ -20,8 +20,9 @@ A production-ready template for creating SSH-based terminal applications with be
    - Mouse support
 
 3. **Session Management**
-   - User fingerprint tracking
-   - Cart persistence
+   - demo-shop / admin-dashboard: SSH public key fingerprint tracking (in-memory)
+   - adventure-game: Username-based sessions with JSON file persistence (`data/sessions.json`)
+   - Cart / game state persistence
    - Session state
 
 4. **Example Application**
@@ -251,16 +252,43 @@ UIComponents.showMessage(screen, 'Success!', 'success');
 
 ## 🔐 Authentication
 
-### Check User Identity
+The example apps demonstrate two different session identification strategies.
+
+### Fingerprint-Based Identity (demo-shop / admin-dashboard)
+
+Sessions are identified by the MD5 hash of the user's SSH public key. This is
+purely in-memory and resets when the server restarts.
 
 ```javascript
+// demo-shop & admin-dashboard — SessionManager.createSession(publicKey)
+const fingerprint = publicKey
+  ? crypto.createHash('md5').update(publicKey.data).digest('hex')
+  : 'anonymous';
+
+const session = { id, fingerprint, createdAt: new Date(), cart: [] };
+
+// In your screen code:
 const fingerprint = this.context.session.fingerprint;
 
 if (fingerprint === 'anonymous') {
   // User connected without SSH key
 } else {
-  // User has unique fingerprint
+  // User has a unique fingerprint derived from their public key
 }
+```
+
+### Username-Based Identity (adventure-game)
+
+Sessions are keyed by the SSH username (`ssh <username>@host`). Game state is
+persisted to a JSON file so players can reconnect and resume.
+
+```javascript
+// adventure-game — SessionManager.createSession(username)
+// Looks up an existing session by username; creates a new one if none found.
+const session = sessionManager.createSession(username); // e.g. 'alice'
+
+// Game state is automatically saved to data/sessions.json
+// and restored on the next connection with the same username.
 ```
 
 ### Store User Data
@@ -302,6 +330,58 @@ export class ProductsScreen {
   }
 }
 ```
+
+## 🤖 LLM Integration (Ollama)
+
+The `adventure-game` example includes a full LLM integration that connects to a
+local [Ollama](https://ollama.com/) instance to power a dynamic game master.
+You can reuse this pattern in your own apps.
+
+### Architecture
+
+```
+┌──────────────┐      ┌────────────────┐      ┌──────────────────┐
+│  UI (room.js)│─────▶│ LLMGameEngine  │─────▶│  OllamaClient    │
+│  user action │      │ prompt + parse │      │  HTTP → Ollama   │
+└──────────────┘      └────────────────┘      └──────────────────┘
+```
+
+1. **OllamaClient** (`src/llm/ollama-client.js`) — thin HTTP wrapper around
+   the Ollama `/api/chat` endpoint with configurable model, base URL, and
+   timeout.
+2. **LLMGameEngine** (`src/llm/game-engine.js`) — builds a system prompt from
+   the game world seed, manages conversation history, and parses the structured
+   JSON responses the model returns.
+
+### Configuration
+
+Set these in your `.env` (or environment):
+
+```bash
+OLLAMA_BASE_URL=http://localhost:11434   # Ollama server address
+OLLAMA_MODEL=qwen3-coder:30b            # Any Ollama-compatible model
+```
+
+### Quick Example
+
+```javascript
+import { OllamaClient } from './llm/ollama-client.js';
+
+const client = new OllamaClient();          // reads env vars automatically
+
+// Check if Ollama is reachable
+if (await client.isAvailable()) {
+  const result = await client.chat([
+    { role: 'system', content: 'You are a helpful assistant.' },
+    { role: 'user',   content: 'Describe this room in two sentences.' }
+  ], { temperature: 0.8, maxTokens: 256 });
+
+  console.log(result.message.content);
+}
+```
+
+The adventure-game gracefully falls back to a static room model when Ollama is
+not running, so the app remains functional without an LLM.
 
 ## 🗄️ Database Integration
 
@@ -384,6 +464,14 @@ screen.key(['up', 'down', 'left', 'right'], (ch, key) => {
 ```
 
 ## 🚢 Deployment
+
+> **Important:** Authentication is disabled by default in all three example apps
+> so that anyone can connect without an SSH key or password. This is intentional
+> for demo/development purposes. For any production deployment you **MUST**
+> configure proper authentication (public key verification, password checks, or
+> both) in the `client.on('authentication', ...)` handler inside
+> `src/server/index.js`. See the [Custom Authentication](#-advanced-topics)
+> section for an example.
 
 ### Development
 
@@ -468,7 +556,8 @@ screen.key(['your-key'], () => {
 ```javascript
 client.on('authentication', (ctx) => {
   if (ctx.method === 'password') {
-    if (ctx.username === 'admin' && ctx.password === 'secret') {
+    // EXAMPLE ONLY - use environment variables in production!
+    if (ctx.username === process.env.ADMIN_USER && ctx.password === process.env.ADMIN_PASS) {
       ctx.accept();
     } else {
       ctx.reject();

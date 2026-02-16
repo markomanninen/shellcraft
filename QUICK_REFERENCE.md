@@ -1,13 +1,13 @@
 # Terminal App Quick Reference
 
-## 🎬 Getting Started
+## Getting Started
 
 ```bash
-# Create new app
-./init.sh my-app-name
+# Create new app (ecommerce template by default)
+./init.sh my-app
 
 # Setup
-cd my-app-name
+cd my-app
 npm install
 npm run generate-keys
 npm start
@@ -16,7 +16,9 @@ npm start
 ssh localhost -p 2222
 ```
 
-## 📁 Project Structure
+## Project Structure
+
+Default e-commerce template (what `./init.sh my-app` generates):
 
 ```
 src/
@@ -34,7 +36,11 @@ src/
     └── product.js    # Data models
 ```
 
-## 🎨 UI Components Cheat Sheet
+The adventure-game adds `src/llm/` with:
+- `ollama-client.js` -- Ollama API client
+- `game-engine.js` -- LLM-powered game logic
+
+## UI Components Cheat Sheet
 
 ### Box
 ```javascript
@@ -109,7 +115,7 @@ UIComponents.showMessage(screen, 'Hello!', 'success')
 // Types: 'info', 'success', 'error', 'warning'
 ```
 
-## 🧭 Navigation
+## Navigation
 
 ```javascript
 // Navigate to screen
@@ -125,7 +131,7 @@ context.navigate('home')
 context.exit()
 ```
 
-## 🔑 Keyboard Shortcuts
+## Keyboard Shortcuts (blessed API)
 
 ```javascript
 // Single key
@@ -142,24 +148,32 @@ screen.key(['M-x'], callback)  // Alt+X
 screen.key(['up', 'down', 'left', 'right'], callback)
 ```
 
-## 👤 Session Access
+### Adventure Game Keys
+
+| Key         | Action                    |
+|-------------|---------------------------|
+| Arrow keys  | Move between rooms        |
+| `h`         | Help / menu               |
+| `i`         | Inventory                 |
+| `q`         | Quit                      |
+
+## Session Access
 
 ```javascript
-// Get session
 const session = context.session
 
-// User fingerprint
+// demo-shop and admin-dashboard identify users by SSH key fingerprint:
 const fingerprint = session.fingerprint
 
-// Cart data
-const cart = session.cart
-cart.push(product)
+// adventure-game identifies users by SSH username instead:
+const username = session.username
 
-// Custom data
+// Shared session data
+const cart = session.cart
 session.user = { name: 'John' }
 ```
 
-## 🎨 Styling
+## Styling
 
 ### Colors
 `black`, `red`, `green`, `yellow`, `blue`, `magenta`, `cyan`, `white`,
@@ -184,9 +198,9 @@ content: '{center}Centered{/}\n' +
          '{blue-bg}Blue background{/}'
 ```
 
-## 🆕 Creating a New Screen
+## Creating a New Screen
 
-1. **Create file** `src/ui/myscreen.js`:
+1. Create file `src/ui/myscreen.js`:
 
 ```javascript
 import { UIComponents } from './components.js'
@@ -208,14 +222,14 @@ export class MyScreen {
       content: 'My Screen'
     })
 
-    screen.key(['escape'], () => {
-      context.navigate('home')
+    this.screen.key(['escape'], () => {
+      this.context.navigate('home')
     })
   }
 }
 ```
 
-2. **Register** in `src/server/router.js`:
+2. Register in `src/server/router.js`:
 
 ```javascript
 import { MyScreen } from '../ui/myscreen.js'
@@ -226,9 +240,9 @@ this.screens = {
 }
 ```
 
-3. **Add to menu** in `src/ui/home.js`
+3. Add to menu in `src/ui/home.js`
 
-## 🌐 API Integration
+## API Integration
 
 ```javascript
 async fetchData() {
@@ -241,7 +255,7 @@ async fetchData() {
 }
 ```
 
-## 🗄️ Database (SQLite)
+## Database (SQLite)
 
 ```bash
 npm install better-sqlite3
@@ -264,7 +278,7 @@ db.prepare('INSERT INTO items (name) VALUES (?)').run('Item 1')
 const items = db.prepare('SELECT * FROM items').all()
 ```
 
-## 🚀 Deployment
+## Deployment
 
 ### Development
 ```bash
@@ -285,7 +299,7 @@ docker build -t my-app .
 docker run -p 2222:2222 my-app
 ```
 
-## 🐛 Common Issues
+## Common Issues
 
 ### Screen not updating
 ```javascript
@@ -303,23 +317,32 @@ screen.children.forEach(child => child.destroy())
 element.focus()  // Ensure focus
 ```
 
-## 📝 NPM Scripts
+## NPM Scripts
 
 ```bash
-npm start          # Start server
-npm run dev        # Dev with auto-reload
+npm start              # Start server
+npm run dev            # Dev with auto-reload
 npm run generate-keys  # Generate SSH keys
+npm test               # Run all tests
+npm run test:unit      # Unit tests only
+npm run test:e2e       # E2E tests only
+npm restart            # Kill port 2222 and restart (adventure-game only)
 ```
 
-## 🔧 Environment Variables
+## Environment Variables
 
 ```bash
-SSH_PORT=2222              # Server port
-HOST_KEY_PATH=./keys/host_key  # SSH key path
-NODE_ENV=development       # Environment
+# All apps
+SSH_PORT=2222                       # Server port
+HOST_KEY_PATH=./keys/host_key      # SSH key path
+NODE_ENV=development                # Environment
+
+# Adventure game only
+OLLAMA_BASE_URL=http://localhost:11434   # Ollama API endpoint
+OLLAMA_MODEL=qwen3-coder:30b            # LLM model for dynamic descriptions
 ```
 
-## 💡 Quick Tips
+## Quick Tips
 
 1. **Focus**: Always set focus to interactive elements
 2. **Cleanup**: Destroy elements before creating new ones
@@ -330,7 +353,7 @@ NODE_ENV=development       # Environment
 7. **Colors**: Use colors to indicate state/importance
 8. **Testing**: Connect locally before deploying
 
-## 📚 Resources
+## Resources
 
 - SSH2: https://github.com/mscdex/ssh2
 - Blessed: https://github.com/chjj/blessed

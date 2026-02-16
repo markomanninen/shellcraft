@@ -1,424 +1,226 @@
 # Terminal App Template - Project Summary
 
-## 📋 What Was Created
+## Overview
 
-A complete, production-ready template generator for building SSH-based terminal applications.
+A template generator and collection of demo applications for building SSH-based terminal UIs with Node.js.
 
-## 📦 File Structure
+## File Structure
 
 ```
 terminal_example/
-├── init.sh                    # Main generator script (executable)
-├── README.md                  # Project overview
-├── USAGE_GUIDE.md            # Complete guide with examples
-├── QUICK_REFERENCE.md        # Quick reference cheat sheet
-├── VISUAL_DEMO.md            # ASCII art visual demonstration
-└── demo-shop/                # Example generated app
+├── init.sh                        # Template generator script (~1,634 lines)
+├── quick-start.sh                 # Quick setup helper script
+├── README.md                      # Project overview
+├── COMPLETE_OVERVIEW.md           # Full project overview
+├── PROJECT_SUMMARY.md             # This file -- technical details
+├── USAGE_GUIDE.md                 # Tutorials and customization
+├── QUICK_REFERENCE.md             # Command and API cheat sheet
+├── VISUAL_DEMO.md                 # ASCII screen mockups
+├── GETTING_STARTED.md             # Step-by-step setup checklist
+├── TESTING_SUMMARY.md             # Test coverage details
+├── INDEX.md                       # Documentation navigation
+├── COMPARISON.md                  # Feature comparison across apps
+├── DESIGN_PRINCIPLES.md           # Architecture decisions
+│
+├── demo-shop/                     # E-commerce demo app
+│   ├── package.json
+│   ├── .env.example
+│   ├── .gitignore
+│   ├── README.md
+│   ├── scripts/
+│   │   └── generate-keys.js       # SSH key generator
+│   ├── src/
+│   │   ├── server/
+│   │   │   ├── index.js           # SSH server entry point
+│   │   │   ├── router.js          # Screen routing
+│   │   │   └── session.js         # Session management (fingerprint-based, in-memory)
+│   │   ├── ui/
+│   │   │   ├── components.js      # Reusable UI component library
+│   │   │   ├── home.js            # Home screen
+│   │   │   ├── products.js        # Product listing screen
+│   │   │   ├── cart.js            # Shopping cart screen
+│   │   │   └── checkout.js        # Checkout form screen
+│   │   └── models/
+│   │       └── product.js         # Product data model
+│   └── test/
+│       ├── unit/
+│       │   ├── product.test.js    # Product model tests
+│       │   └── session.test.js    # Session manager tests
+│       ├── e2e/
+│       │   ├── server.test.js     # SSH server connection tests
+│       │   └── workflow.test.js   # User workflow tests
+│       └── helpers/
+│           └── test-utils.js      # Shared test utilities
+│
+├── adventure-game/                # Text adventure with LLM integration
+│   ├── package.json
+│   ├── .env.example
+│   ├── .gitignore
+│   ├── README.md
+│   ├── scripts/
+│   │   └── generate-keys.js       # SSH key generator
+│   ├── src/
+│   │   ├── server/
+│   │   │   ├── index.js           # SSH server entry point
+│   │   │   ├── router.js          # Screen routing
+│   │   │   └── session.js         # Session management (username-based, JSON persistence)
+│   │   ├── llm/
+│   │   │   ├── ollama-client.js   # Ollama API client
+│   │   │   └── game-engine.js     # LLM-powered game engine
+│   │   ├── ui/
+│   │   │   ├── components.js      # Reusable UI component library
+│   │   │   ├── game.js            # Main game screen
+│   │   │   ├── room.js            # Room display and interaction
+│   │   │   ├── inventory.js       # Inventory screen
+│   │   │   ├── help.js            # Help screen
+│   │   │   ├── stats.js           # Player stats screen
+│   │   │   └── loading-animation.js  # Wizard loading animation for LLM calls
+│   │   ├── models/
+│   │   │   └── game.js            # Game state and room data
+│   │   ├── middleware/            # (placeholder)
+│   │   ├── routes/                # (placeholder)
+│   │   └── utils/                 # (placeholder)
+│   └── test/
+│       ├── unit/
+│       │   ├── game.test.js           # Game model tests
+│       │   ├── session.test.js        # Session manager tests
+│       │   ├── llm-engine.test.js     # LLM game engine tests
+│       │   └── ollama-client.test.js  # Ollama client tests
+│       ├── e2e/
+│       │   ├── server.test.js     # SSH server connection tests
+│       │   └── workflow.test.js   # Game workflow tests
+│       └── helpers/
+│           └── test-utils.js      # Shared test utilities
+│
+├── admin-dashboard/               # System monitoring dashboard
+│   ├── package.json
+│   ├── .env.example
+│   ├── .gitignore
+│   ├── README.md
+│   ├── scripts/
+│   │   └── generate-keys.js       # SSH key generator
+│   ├── src/
+│   │   ├── server/
+│   │   │   ├── index.js           # SSH server entry point
+│   │   │   ├── router.js          # Screen routing
+│   │   │   └── session.js         # Session management (fingerprint-based, in-memory)
+│   │   ├── ui/
+│   │   │   ├── components.js      # Reusable UI component library
+│   │   │   ├── dashboard.js       # Main dashboard screen
+│   │   │   ├── overview.js        # System overview screen
+│   │   │   ├── processes.js       # Process monitor screen
+│   │   │   ├── resources.js       # Resource usage screen
+│   │   │   ├── logs.js            # System logs screen
+│   │   │   ├── network.js         # Network info screen
+│   │   │   ├── services.js        # Services screen
+│   │   │   └── settings.js        # Settings screen
+│   │   └── models/
+│   │       └── system.js          # System data model (OS stats)
+│   └── test/
+│       ├── unit/
+│       │   ├── system.test.js     # System model tests
+│       │   └── session.test.js    # Session manager tests
+│       ├── e2e/
+│       │   ├── server.test.js     # SSH server connection tests
+│       │   └── workflow.test.js   # Dashboard workflow tests
+│       └── helpers/
+│           └── test-utils.js      # Shared test utilities
+│
+└── animation-demo/                # Standalone terminal animation viewer
     ├── package.json
-    ├── .env.example
     ├── .gitignore
-    ├── README.md
-    ├── src/
-    │   ├── server/
-    │   │   ├── index.js      # SSH server
-    │   │   ├── router.js     # Screen routing
-    │   │   └── session.js    # Session management
-    │   ├── ui/
-    │   │   ├── components.js # UI component library
-    │   │   ├── home.js       # Home screen
-    │   │   ├── products.js   # Products screen
-    │   │   ├── cart.js       # Cart screen
-    │   │   └── checkout.js   # Checkout screen
-    │   └── models/
-    │       └── product.js    # Product data model
-    ├── scripts/
-    │   └── generate-keys.js  # SSH key generator
-    ├── config/               # Configuration directory
-    ├── data/                 # Data storage directory
-    ├── keys/                 # SSH keys directory
-    └── logs/                 # Logs directory
+    ├── index.js                   # Entry point and animation runner
+    └── animations.js              # Animation frame definitions
 ```
 
-## 🎯 What It Does
+## Template Generator (`init.sh`)
 
-### The Generator Script (`init.sh`)
-
-Creates a complete terminal application with:
-- SSH server using ssh2
-- Beautiful TUI using blessed
-- Component library (lists, tables, forms, buttons)
-- Example e-commerce app (products, cart, checkout)
-- Session management
-- Navigation system
-- Configuration files
-- Documentation
+The generator script is ~1,634 lines of bash. Running `./init.sh <app-name>` produces a complete SSH terminal app with server, UI, models, tests, configuration, and documentation.
 
 ### Usage
-
 ```bash
-# Make executable
 chmod +x init.sh
-
-# Create new app
 ./init.sh my-app-name
-
-# Setup and run
 cd my-app-name
 npm install
 npm run generate-keys
+npm test
 npm start
-
-# Connect
-ssh localhost -p 2222
+# In another terminal: ssh localhost -p 2222
 ```
 
-## ✨ Key Features
+## Session Management
 
-### 1. SSH Server
-- Built with `ssh2` library
-- Public key authentication
-- Anonymous access support
-- Secure connections
-- Session management
+The project demonstrates two different session strategies:
 
-### 2. TUI Framework
-- Built with `blessed` library
-- Reusable components:
-  - Boxes (static content)
-  - Lists (menus)
-  - Tables (data grids)
-  - Forms (input collection)
-  - Buttons (actions)
-  - Messages (notifications)
+**Fingerprint-based, in-memory (demo-shop, admin-dashboard):**
+Sessions are identified by a hash of the client's SSH public key. State is held in memory and lost on server restart.
 
-### 3. Navigation System
-- Screen-to-screen routing
-- Context passing
-- Back navigation
-- Keyboard shortcuts
+**Username-based, file-persisted (adventure-game):**
+Sessions are keyed by the SSH username. Game state is saved to JSON files on disk, allowing players to disconnect and resume later by reconnecting with the same username.
 
-### 4. Example Application
-- Home screen with menu
-- Products catalog
-- Shopping cart
-- Checkout flow
-- Complete user experience
+## Technology Stack
 
-### 5. Session Management
-- User fingerprinting
-- Cart persistence
-- Session state
-- Anonymous & authenticated users
+| Dependency | Purpose |
+|-----------|---------|
+| ssh2 | SSH server implementation |
+| blessed | Terminal UI framework |
+| dotenv | Environment configuration |
+| nanoid | ID generation |
+| nodemon | Development auto-reload |
 
-## 📚 Documentation
+The adventure-game additionally integrates with **Ollama** for local LLM inference (no extra npm dependency; uses HTTP requests).
 
-### README.md (Main)
-- Project overview
-- Quick start guide
-- Feature list
-- Use cases
-- Deployment instructions
+## Testing
 
-### USAGE_GUIDE.md (Complete Guide)
-- How to customize
-- UI component examples
-- Authentication guide
-- API integration
-- Database integration
-- Styling tips
-- Deployment options
-- Troubleshooting
-- Advanced topics
-- Project ideas
+Each SSH-based app includes unit and e2e tests using the Node.js built-in test runner.
 
-### QUICK_REFERENCE.md (Cheat Sheet)
-- Quick commands
-- Component syntax
-- Navigation patterns
-- Keyboard shortcuts
-- Session access
-- Styling reference
-- Common tasks
-- NPM scripts
+```bash
+npm test            # All tests
+npm run test:unit   # Unit tests only
+npm run test:e2e    # E2E tests only
+npm run test:watch  # Watch mode
+```
 
-### VISUAL_DEMO.md (Visual Guide)
-- ASCII mockups of all screens
-- Navigation flow diagram
-- Keyboard shortcut reference
-- Color scheme
-- Interaction examples
-- Customization examples
+**demo-shop tests:** product model, session management, server connections, shopping workflow.
+**adventure-game tests:** game model, session persistence, LLM engine logic, Ollama client, server connections, game workflow.
+**admin-dashboard tests:** system model, session management, server connections, dashboard workflow.
 
-## 🚀 Technology Stack
+## Documentation
 
-### Core Dependencies
-- **ssh2** (^1.15.0) - SSH server implementation
-- **blessed** (^0.1.81) - Terminal UI framework
-- **dotenv** (^16.4.5) - Environment configuration
-- **nanoid** (^5.0.4) - ID generation
+The project includes 11 markdown files at the root level, plus a README in each app directory:
 
-### Dev Dependencies
-- **nodemon** (^3.0.2) - Development auto-reload
+| File | Description |
+|------|-------------|
+| README.md | Project overview and quick start |
+| COMPLETE_OVERVIEW.md | Full project overview |
+| PROJECT_SUMMARY.md | File tree and technical details |
+| USAGE_GUIDE.md | Tutorials, customization, API integration |
+| QUICK_REFERENCE.md | Command and component cheat sheet |
+| VISUAL_DEMO.md | ASCII screen mockups |
+| GETTING_STARTED.md | Step-by-step setup checklist |
+| TESTING_SUMMARY.md | Test coverage details |
+| INDEX.md | Documentation navigation guide |
+| COMPARISON.md | Feature comparison across apps |
+| DESIGN_PRINCIPLES.md | Architecture and design decisions |
 
-## 🎨 Generated Application Features
-
-### Screens
-1. **Home Screen**
-   - Main menu
-   - Navigation options
-   - Branding header
-   - Help footer
-
-2. **Products Screen**
-   - Product table
-   - Browse with arrows
-   - Add to cart
-   - Back navigation
-
-3. **Cart Screen**
-   - Item list with prices
-   - Total calculation
-   - Checkout button
-   - Clear cart option
-   - Back navigation
-
-4. **Checkout Screen**
-   - Input form (name, address, email)
-   - Submit button
-   - Cancel option
-   - Success message
-
-### UI Components
-- **UIComponents.createBox()** - Static content
-- **UIComponents.createList()** - Menus/lists
-- **UIComponents.createTable()** - Data tables
-- **UIComponents.createForm()** - Input forms
-- **UIComponents.createInput()** - Text inputs
-- **UIComponents.createButton()** - Buttons
-- **UIComponents.showMessage()** - Notifications
-
-### Data Models
-- **ProductModel** - Product catalog with:
-  - ID, name, description
-  - Price, stock
-  - CRUD operations
-
-## 🔐 Security Features
-
-- SSH encryption
-- Public key authentication
-- Optional anonymous access
-- Session fingerprinting
-- Secure key storage
-- Input validation ready
-
-## 🎯 Use Cases
-
-### E-commerce
-- Developer tools shop
-- Digital product store
-- Subscription service
-- License management
-
-### Games
-- Text adventures
-- MUD servers
-- Interactive fiction
-- Puzzle games
-
-### Tools
-- Admin dashboards
-- API explorers
-- Database clients
-- Log viewers
-- Monitoring tools
-
-### Information
-- Documentation browsers
-- Knowledge bases
-- News readers
-- Support systems
-
-## 📈 Extension Possibilities
-
-### Easy Additions
-- More screens
-- Custom components
-- Different products
-- Styling changes
-- Keyboard shortcuts
-
-### Medium Additions
-- SQLite database
-- REST API endpoints
-- User authentication
-- File uploads
-- Email notifications
-
-### Advanced Additions
-- Stripe payments
-- OAuth 2.0 server
-- Subscription billing
-- Order fulfillment
-- Real-time features
-- Multi-tenancy
-
-## 🌐 Deployment Options
+## Deployment
 
 ### Development
 ```bash
-npm run dev  # Nodemon auto-reload
+npm run dev  # Auto-reload with nodemon
 ```
 
 ### Production
-
-**PM2**
 ```bash
+# PM2
 pm2 start src/server/index.js
-pm2 startup
-pm2 save
+
+# Docker
+docker build -t my-terminal-app .
+docker run -p 2222:2222 my-terminal-app
 ```
 
-**Docker**
-```dockerfile
-FROM node:20-alpine
-WORKDIR /app
-COPY . .
-RUN npm ci --production
-RUN npm run generate-keys
-CMD ["npm", "start"]
-```
+## License
 
-**Cloud Platforms**
-- DigitalOcean Droplet
-- AWS EC2
-- Google Cloud Compute
-- Azure VM
-- Heroku (with SSH buildpack)
-
-## 💡 Unique Selling Points
-
-### Why This Template?
-
-1. **Complete Foundation** - Everything you need to start
-2. **Production Ready** - Not a toy, real SSH server
-4. **Beautiful UI** - Professional terminal interface
-5. **Well Documented** - Extensive guides and examples
-6. **Extensible** - Easy to add features
-7. **Modern Stack** - Latest Node.js and libraries
-8. **Best Practices** - Clean code, good structure
-
-### What Makes It Special?
-
-- **Instant Scaffold** - One command creates full app
-- **Real SSH** - Not just CLI, actual SSH server
-- **Component Library** - Reusable UI elements
-- **Example App** - Working e-commerce demo
-- **Multiple Guides** - Something for everyone
-- **Visual Demos** - See before you build
-
-## 🎓 Learning Path
-
-### Beginner (Week 1)
-- Run init script
-- Explore generated code
-- Modify text and colors
-- Add menu item
-- Change products
-
-### Intermediate (Week 2-4)
-- Create new screen
-- Add custom component
-- Integrate API
-- Add database
-- Implement auth
-
-### Advanced (Month 2-3)
-- Add payment processing
-- Build REST API
-- OAuth integration
-- Deploy to production
-- Monitoring & scaling
-
-## 📊 Project Metrics
-
-### Lines of Code Generated
-- **init.sh**: ~650 lines
-- **Server code**: ~200 lines
-- **UI code**: ~500 lines
-- **Models**: ~50 lines
-- **Scripts**: ~30 lines
-- **Total**: ~1,430 lines of code
-
-### Documentation
-- 5 comprehensive markdown files
-- 2,000+ lines of documentation
-- 50+ code examples
-- 10+ ASCII diagrams
-- Multiple tutorials
-
-### Time to First App
-- Run generator: 5 seconds
-- Install deps: 30 seconds
-- Generate keys: 2 seconds
-- Start server: 1 second
-- **Total: ~40 seconds to running app**
-
-## 🎉 Success Criteria
-
-✅ One-command project generation
-✅ Working SSH server
-✅ Beautiful terminal UI
-✅ Complete example app
-✅ Reusable components
-✅ Extensive documentation
-✅ Visual demonstrations
-✅ Easy customization
-✅ Production ready
-✅ Well structured code
-
-## 🚀 Next Steps for Users
-
-1. **Generate App**: `./init.sh my-app`
-2. **Explore**: Connect and navigate
-3. **Customize**: Change text, colors, products
-4. **Extend**: Add screens, features
-5. **Integrate**: Connect to APIs, databases
-6. **Deploy**: Share with world!
-
-## 🤝 Community
-
-### Ways to Use This
-
-- **Personal Projects** - Build your own tools
-- **Commercial Products** - Sell via terminal
-- **Open Source** - Share with community
-- **Education** - Learn SSH and TUI
-- **Experiments** - Try new ideas
-- **Portfolio** - Showcase skills
-
-## 📄 License
-
-MIT License - Free for any use, commercial or personal!
-
-## 🎯 Mission Accomplished
-
-Created a complete, well-documented, production-ready template that anyone can use to start their own SSH-based terminal project in minutes.
-
----
-
-## 🏁 Quick Start Reminder
-
-```bash
-# In terminal_example directory
-./init.sh awesome-app
-cd awesome-app
-npm install
-npm run generate-keys
-npm start
-
-# In another terminal
-ssh localhost -p 2222
-```
-
-**Enjoy building amazing terminal applications! 🚀**
+MIT License

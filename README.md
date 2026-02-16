@@ -1,116 +1,144 @@
 # Terminal App Template Generator
 
-> Create beautiful SSH-based terminal applications with TUI
+> Build SSH-accessible terminal applications with rich text user interfaces
 
-## 🌟 What is This?
+## What is This?
 
-This is a **complete project generator** that scaffolds production-ready SSH-based terminal applications with Text User Interface (TUI). Perfect for creating unique, developer-focused applications accessible via SSH.
+A project generator and collection of demo applications for building SSH-based terminal apps with TUI (Text User Interface). It scaffolds a working Node.js project with an SSH server, screen-based navigation, session management, and reusable UI components -- all accessible via any standard SSH client.
 
-## ✨ Features
+## Features
 
-- 🔐 **SSH Server** with public key authentication
-- 🎨 **Beautiful TUI** using blessed library
-- 🧭 **Navigation System** with screen routing
-- 👤 **Session Management** with user tracking
-- 🛒 **Complete Example** e-commerce app (products, cart, checkout)
-- 🎯 **Reusable Components** (lists, tables, forms, buttons)
-- 🧪 **Testing Suite** with unit and E2E tests ⭐ NEW!
-- 📦 **Ready to Deploy** with Docker & PM2 support
-- 🎮 **3 Demo Apps** showing different use cases ⭐ NEW!
+- **SSH Server** -- anonymous or public key authentication
+- **TUI Framework** -- rich terminal UI powered by blessed (lists, tables, forms, buttons)
+- **Screen Router** -- declarative screen-to-screen navigation with automatic cleanup
+- **Session Management** -- per-connection state with optional persistence to disk
+- **Template Generator** -- `init.sh` scaffolds new projects with selectable app types
+- **4 Demo Apps** -- fully working examples covering different use cases
+- **Testing Suite** -- unit and E2E tests using Node.js built-in test runner
 
-## 🚀 Quick Start
+## Security Notice
 
-### Generate Your App
+All demo apps accept anonymous SSH connections and are intended for **local development and demonstration only**. They are not hardened for production or public-facing deployment. If you expose a server to the internet, implement proper authentication, rate limiting, and access controls.
+
+## Demo Apps
+
+### demo-shop -- E-commerce
+
+A terminal-based storefront with product catalog, shopping cart, and checkout flow. Demonstrates forms, tables, and multi-screen workflows.
+
+### adventure-game -- Text RPG with LLM Integration
+
+An interactive text adventure powered by a Game Master LLM via Ollama. Features include:
+
+- LLM-powered narrative generation (configurable model via `OLLAMA_MODEL`)
+- Session persistence across server restarts (saved to `data/sessions.json`)
+- Resume and continue support -- reconnect and pick up where you left off
+- Free-text input to the Game Master alongside suggested actions
+- Animated wizard loading screen while the LLM responds
+- Offline fallback mode with static room descriptions
+
+### admin-dashboard -- System Monitoring
+
+A server monitoring dashboard with screens for system overview, running processes, resource usage, logs, network information, services, and settings.
+
+### animation-demo -- Terminal Animations
+
+A standalone ASCII animation showcase. Displays multiple frame-based animations with speed control, pause/play, and keyboard navigation. Useful as a reference for building loading screens and visual effects.
+
+## Quick Start
+
+### Generate a New App
 
 ```bash
-# Make init script executable
 chmod +x init.sh
 
-# Create your terminal app
-./init.sh my-awesome-app
+# Create a minimal starter app
+./init.sh my-app
 
-# Navigate to project
-cd my-awesome-app
+# Create an e-commerce app with full product/cart/checkout screens
+./init.sh my-app ecommerce
 
-# Install dependencies
+# Explicitly request a minimal template
+./init.sh my-app minimal
+```
+
+### Run a Generated App
+
+```bash
+cd my-app
 npm install
-
-# Generate SSH host keys
 npm run generate-keys
-
-# Start the server
 npm start
 ```
 
-### Connect to Your App
+### Run a Demo App
 
 ```bash
-# In another terminal
+cd demo-shop          # or adventure-game, admin-dashboard
+npm install
+npm run generate-keys
+npm start
+```
+
+### Connect
+
+```bash
 ssh localhost -p 2222
 ```
 
-You'll see a beautiful terminal interface with:
-- 📦 Product catalog
-- 🛒 Shopping cart
-- 💳 Checkout flow
-- Full keyboard navigation
+Each app runs on port 2222 by default (configurable via `SSH_PORT` in `.env`).
 
-## 📖 Documentation
-
-- **[USAGE_GUIDE.md](./USAGE_GUIDE.md)** - Complete guide with examples and tutorials
-- **[QUICK_REFERENCE.md](./QUICK_REFERENCE.md)** - Quick reference for common tasks
-- **[DESIGN_PRINCIPLES.md](./DESIGN_PRINCIPLES.md)** - Critical design principles for SSH/blessed apps
-
-## 🏗️ What Gets Generated
+## Project Structure
 
 ```
-my-awesome-app/
+terminal_example/
+├── init.sh                  # Template generator script
+├── quick-start.sh           # One-liner setup helper
+├── demo-shop/               # E-commerce demo app
+├── adventure-game/          # Text RPG with LLM integration
+├── admin-dashboard/         # System monitoring dashboard
+├── animation-demo/          # ASCII animation showcase
+├── USAGE_GUIDE.md           # Detailed usage documentation
+├── QUICK_REFERENCE.md       # Quick reference for common tasks
+└── DESIGN_PRINCIPLES.md     # Design principles for SSH/blessed apps
+```
+
+### Generated App Structure
+
+```
+my-app/
 ├── src/
-│   ├── server/          # SSH server & routing
-│   │   ├── index.js     # Main entry point
-│   │   ├── router.js    # Screen navigation
-│   │   └── session.js   # Session management
-│   ├── ui/              # User interface
-│   │   ├── components.js # Reusable UI components
-│   │   ├── home.js      # Home screen
-│   │   ├── products.js  # Products listing
-│   │   ├── cart.js      # Shopping cart
-│   │   └── checkout.js  # Checkout form
-│   └── models/          # Data models
-│       └── product.js   # Product model
-├── config/              # Configuration files
-├── keys/                # SSH keys (auto-generated)
-├── scripts/             # Utility scripts
-├── package.json         # Dependencies
-├── .env.example         # Environment template
-└── README.md            # Project documentation
+│   ├── server/
+│   │   ├── index.js         # SSH server entry point
+│   │   ├── router.js        # Screen navigation router
+│   │   └── session.js       # Session management
+│   ├── ui/
+│   │   ├── components.js    # Reusable UI components
+│   │   ├── home.js          # Home screen
+│   │   └── ...              # Additional screens
+│   └── models/              # Data models
+├── test/
+│   ├── unit/                # Unit tests
+│   ├── e2e/                 # End-to-end tests
+│   └── helpers/             # Test utilities
+├── keys/                    # SSH host keys (generated, gitignored)
+├── scripts/
+│   └── generate-keys.js     # RSA key pair generator
+├── package.json
+├── .env.example
+└── .gitignore
 ```
 
-## 🎯 Use Cases
+## Technology Stack
 
-### E-commerce
-- Developer-focused product shops
-- Unique, memorable shopping experience
-- Perfect for tech products
+- **[ssh2](https://github.com/mscdex/ssh2)** -- SSH server implementation
+- **[blessed](https://github.com/chjj/blessed)** -- Terminal UI framework
+- **[dotenv](https://github.com/motdotla/dotenv)** -- Environment configuration
+- **[nanoid](https://github.com/ai/nanoid)** -- Unique ID generation
 
-### Games
-- Text-based adventure games
-- MUD (Multi-User Dungeon) servers
-- Interactive fiction
+The adventure-game additionally uses **Ollama** for local LLM inference (not bundled as an npm dependency; runs as a separate service).
 
-### Tools
-- Admin dashboards
-- API explorers
-- Database clients
-- Log viewers
-
-### Information
-- Documentation browsers
-- Knowledge bases
-- News aggregators
-- RSS readers
-
-## 🎨 Example: Creating a Custom Screen
+## Creating a Custom Screen
 
 ```javascript
 // src/ui/myscreen.js
@@ -136,8 +164,8 @@ export class MyScreen {
 
     menu.on('select', (item, index) => {
       UIComponents.showMessage(
-        this.screen, 
-        `Selected: ${item}`, 
+        this.screen,
+        `Selected: ${item}`,
         'success'
       );
     });
@@ -149,31 +177,36 @@ export class MyScreen {
 }
 ```
 
-## 🔧 Customization
+Register the screen in `src/server/router.js`:
 
-The generated template is fully customizable:
+```javascript
+import { MyScreen } from '../ui/myscreen.js';
 
-- **Screens**: Add/modify screens in `src/ui/`
-- **Models**: Update data models in `src/models/`
-- **Styling**: Change colors and layouts
-- **Authentication**: Customize in `src/server/index.js`
-- **API**: Add external API integrations
+this.screens = {
+  home: HomeScreen,
+  myscreen: MyScreen,
+  // ...
+};
+```
 
-## 🛠️ Technology Stack
+## Customization
 
-- **[ssh2](https://github.com/mscdex/ssh2)** - SSH server implementation
-- **[blessed](https://github.com/chjj/blessed)** - TUI framework
-- **[dotenv](https://github.com/motdotla/dotenv)** - Environment configuration
-- **[nanoid](https://github.com/ai/nanoid)** - ID generation
+- **Screens** -- Add or modify screens in `src/ui/`
+- **Models** -- Update data models in `src/models/`
+- **Styling** -- Blessed supports 256 colors and multiple border types
+- **Authentication** -- Customize in `src/server/index.js`
+- **Session Data** -- Extend the session object in `src/server/session.js`
 
-## 🌐 Deployment
+## Deployment
 
 ### Local Development
+
 ```bash
-npm run dev  # Auto-reload on changes
+npm run dev  # Uses nodemon for auto-reload
 ```
 
 ### Production (PM2)
+
 ```bash
 pm2 start src/server/index.js --name my-app
 pm2 startup
@@ -181,68 +214,26 @@ pm2 save
 ```
 
 ### Docker
+
 ```bash
 docker build -t my-app .
 docker run -p 2222:2222 my-app
 ```
 
-### Public Access
-1. Open firewall port 2222
-2. Configure port forwarding on router
-3. Point domain to your server
-4. Connect: `ssh your-domain.com -p 2222`
+## Documentation
 
-## 📚 Learn More
+- **[USAGE_GUIDE.md](./USAGE_GUIDE.md)** -- Complete guide with examples and tutorials
+- **[QUICK_REFERENCE.md](./QUICK_REFERENCE.md)** -- Quick reference for common tasks
+- **[DESIGN_PRINCIPLES.md](./DESIGN_PRINCIPLES.md)** -- Design principles for SSH/blessed apps
 
-### Tutorials
-- [Complete Usage Guide](./USAGE_GUIDE.md)
-- [Quick Reference](./QUICK_REFERENCE.md)
-
-### Resources
-- [SSH2 Documentation](https://github.com/mscdex/ssh2)
-- [Blessed Documentation](https://github.com/chjj/blessed)
-
-## 💡 Project Ideas
-
-1. **Developer Tools Shop** - Sell software licenses
-2. **Text Game Server** - Multiplayer text adventures
-3. **Admin Dashboard** - Server monitoring via SSH
-4. **API Explorer** - Interactive API testing tool
-5. **Documentation Browser** - Searchable docs
-6. **Ticket System** - Support via terminal
-7. **News Reader** - RSS aggregator
-8. **Weather Dashboard** - Terminal weather app
-9. **Chat Server** - Terminal chat rooms
-10. **Code Snippet Manager** - Share code snippets
-
-## 🤝 Contributing
-
-Contributions welcome! Ideas for improvement:
-
-- Additional UI components
-- More example screens
-- Database integrations
-- Payment processing examples
-- Testing utilities
-
-## 📄 License
-
-MIT License - Free to use for any project, commercial or personal!
-
-## 🎉 Example Apps Built with This
-
-Have you built something cool with this template? Let us know!
-
-## ⚡ One-Liner Setup
+## One-Liner Setup
 
 ```bash
 ./init.sh my-app && cd my-app && npm i && npm run generate-keys && npm start
 ```
 
-Then connect with: `ssh localhost -p 2222`
+Then connect: `ssh localhost -p 2222`
 
----
+## License
 
-**Built with ❤️ for the terminal community**
-
-🚀 **[Get Started Now](#-quick-start)** | 📖 **[Read the Docs](./USAGE_GUIDE.md)** | ⭐ **[Star on GitHub](#)**
+MIT License -- free to use for any project, commercial or personal.
