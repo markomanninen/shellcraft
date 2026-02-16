@@ -28,7 +28,21 @@ A terminal-based storefront with product catalog, shopping cart, and checkout fl
 
 ### adventure-game -- Text RPG with LLM Integration
 
-An interactive text adventure powered by a Game Master LLM via Ollama. Features include:
+An interactive text adventure powered by a Game Master LLM via Ollama.
+
+<p align="center">
+  <img src="docs/images/adventure-menu.png" alt="Adventure Game Menu" width="600">
+</p>
+
+<p align="center">
+  <img src="docs/images/adventure-game.png" alt="Adventure Game - Village Square" width="600">
+</p>
+
+<p align="center">
+  <img src="docs/images/adventure-loading.png" alt="Wizard Loading Animation" width="300">
+</p>
+
+Features include:
 
 - LLM-powered narrative generation (configurable model via `OLLAMA_MODEL`)
 - Session persistence across server restarts (saved to `data/sessions.json`)
