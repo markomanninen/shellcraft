@@ -190,6 +190,13 @@ extract_errors() {
         errors+=("missing_script:$app_name:$script_name")
     fi
     
+    # Pattern: Could not find file (glob pattern issue)
+    if echo "$logs" | grep -q "Could not find"; then
+        file_pattern=$(echo "$logs" | grep -o "Could not find '[^']*'" | head -1 | sed "s/Could not find '//;s/'$//")
+        app_name=$(echo "$logs" | grep -oE '\([a-zA-Z0-9_-]+\)' | head -1 | tr -d '()')
+        errors+=("glob_pattern:$app_name:$file_pattern")
+    fi
+    
     # Pattern: npm audit vulnerabilities
     if echo "$logs" | grep -q "vulnerabilities found"; then
         # Extract app name from "NPM Audit (app-name)"
@@ -242,6 +249,11 @@ suggest_fix() {
         "missing_script")
             echo "Add '$detail' script to $component/package.json"
             echo "  Example: \"$detail\": \"echo \\\"No tests\\\" && exit 0\""
+            ;;
+        "glob_pattern")
+            echo "Fix glob pattern in $component/package.json"
+            echo "  The pattern '$detail' is not expanding correctly"
+            echo "  Use simpler patterns like 'test/unit/*.test.js' instead of '**/*.test.js'"
             ;;
         "npm_audit")
             echo "Fix security vulnerabilities in $component"

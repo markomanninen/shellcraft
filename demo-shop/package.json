@@ -9,8 +9,8 @@
     "dev": "nodemon src/server/index.js",
     "generate-keys": "node scripts/generate-keys.js",
     "test": "npm run test:unit && npm run test:e2e",
-    "test:unit": "node --test test/unit/**/*.test.js",
-    "test:e2e": "node --test test/e2e/**/*.test.js",
+    "test:unit": "node --test test/unit/*.test.js",
+    "test:e2e": "node --test test/e2e/*.test.js",
     "test:watch": "node --test --watch"
   },
   "keywords": ["ssh", "terminal", "tui", "shop", "cli"],
