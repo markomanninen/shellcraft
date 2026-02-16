@@ -20,6 +20,20 @@ A project generator and collection of demo applications for building SSH-based t
 
 All demo apps accept anonymous SSH connections and are intended for **local development and demonstration only**. They are not hardened for production or public-facing deployment. If you expose a server to the internet, implement proper authentication, rate limiting, and access controls.
 
+**📋 For detailed security information, see [SECURITY.md](./SECURITY.md)**
+
+### Security & Quality Assurance
+
+This project includes automated security and quality checks:
+
+- **🔒 CodeQL Security Scanning** - Automated code analysis for vulnerabilities
+- **🔍 Dependency Scanning** - Weekly npm audit for dependency vulnerabilities  
+- **✅ Automated Testing** - CI/CD tests run on all pull requests
+- **🤖 Dependabot** - Automated dependency updates with security patches
+- **📝 Code Review Process** - All changes require review before merge
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for contribution guidelines.
+
 ## Demo Apps
 
 ### demo-shop -- E-commerce
@@ -233,6 +247,28 @@ docker run -p 2222:2222 my-app
 ```
 
 Then connect: `ssh localhost -p 2222`
+
+## Contributing
+
+We welcome contributions! Please read our [CONTRIBUTING.md](./CONTRIBUTING.md) for:
+
+- Development workflow and setup
+- Coding standards and guidelines  
+- Testing requirements
+- Security best practices
+- Pull request process
+
+By contributing, you agree to abide by our [Code of Conduct](./CODE_OF_CONDUCT.md).
+
+## Security
+
+Security is a top priority. Please review:
+
+- **[SECURITY.md](./SECURITY.md)** - Security policy and vulnerability reporting
+- **Security Best Practices** - Guidelines for production deployments
+- **Automated Security Scanning** - CodeQL and dependency scanning
+
+To report a security vulnerability, please follow the process in [SECURITY.md](./SECURITY.md).
 
 ## License
 

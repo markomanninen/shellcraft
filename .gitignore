@@ -4,3 +4,32 @@
 *.swo
 .env
 node_modules/
+
+# SSH Keys (generated locally)
+*/keys/*
+!*/keys/.gitkeep
+
+# Session data
+*/data/sessions.json
+
+# Logs
+*/logs/*.log
+logs/
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# IDE
+.vscode/
+.idea/
+*.sublime-*
+
+# OS
+Thumbs.db
+*.bak
+
+# Temporary files
+tmp/
+temp/
+*.tmp

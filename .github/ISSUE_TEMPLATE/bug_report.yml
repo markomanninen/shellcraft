@@ -1,0 +1,94 @@
+name: Bug Report
+description: Report a bug or unexpected behavior
+title: "[Bug]: "
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug! Please fill out the information below.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of what the bug is
+      placeholder: Tell us what you see!
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to Reproduce
+      description: Steps to reproduce the behavior
+      placeholder: |
+        1. Run '...'
+        2. Connect via '...'
+        3. Navigate to '...'
+        4. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What you expected to happen
+      placeholder: Describe what should have happened
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: What actually happened
+      placeholder: Describe what actually happened
+    validations:
+      required: true
+
+  - type: dropdown
+    id: app
+    attributes:
+      label: Which demo app?
+      options:
+        - demo-shop
+        - admin-dashboard
+        - adventure-game
+        - animation-demo
+        - Generated app
+        - Template generator (init.sh)
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Please provide environment details
+      placeholder: |
+        - OS: [e.g., Ubuntu 22.04, macOS 14.0]
+        - Node.js version: [e.g., 20.10.0]
+        - SSH client: [e.g., OpenSSH 8.9]
+      value: |
+        - OS: 
+        - Node.js version: 
+        - SSH client: 
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant Logs
+      description: Please copy and paste any relevant log output
+      render: shell
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Add any other context about the problem here
+      placeholder: Screenshots, related issues, etc.
