@@ -1,0 +1,13 @@
+{
+  "name": "animation-demo",
+  "version": "1.0.0",
+  "description": "ASCII animation showcase for terminal loading screens",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "blessed": "^0.1.81"
+  }
+}
