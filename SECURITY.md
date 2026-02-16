@@ -61,8 +61,9 @@ If you plan to deploy any application based on this template to a production or 
 If you discover a security vulnerability in this project, please report it responsibly:
 
 1. **Do NOT** open a public issue
-2. Email the maintainer directly at: [maintainer email - to be added]
-3. Provide detailed information:
+2. **For critical vulnerabilities**: Use [GitHub Security Advisories](https://github.com/markomanninen/terminal_example/security/advisories/new) to report privately
+3. **For non-critical issues**: Email the maintainer at the email address found in the git repository or open a private security advisory
+4. Provide detailed information:
    - Description of the vulnerability
    - Steps to reproduce
    - Potential impact
