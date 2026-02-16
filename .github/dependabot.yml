@@ -1,0 +1,60 @@
+version: 2
+updates:
+  # GitHub Actions dependencies
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "github-actions"
+
+  # demo-shop dependencies
+  - package-ecosystem: "npm"
+    directory: "/demo-shop"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "demo-shop"
+    versioning-strategy: increase
+
+  # admin-dashboard dependencies
+  - package-ecosystem: "npm"
+    directory: "/admin-dashboard"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "admin-dashboard"
+    versioning-strategy: increase
+
+  # adventure-game dependencies
+  - package-ecosystem: "npm"
+    directory: "/adventure-game"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "adventure-game"
+    versioning-strategy: increase
+
+  # animation-demo dependencies
+  - package-ecosystem: "npm"
+    directory: "/animation-demo"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "animation-demo"
+    versioning-strategy: increase

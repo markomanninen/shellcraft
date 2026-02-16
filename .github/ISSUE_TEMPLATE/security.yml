@@ -1,0 +1,82 @@
+name: Security Vulnerability
+description: Report a security vulnerability (privately if critical)
+title: "[Security]: "
+labels: ["security", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ⚠️ **IMPORTANT**: If this is a critical security vulnerability, please DO NOT submit a public issue.
+        Instead, follow the responsible disclosure process in [SECURITY.md](../../SECURITY.md).
+
+  - type: checkboxes
+    id: critical
+    attributes:
+      label: Severity
+      description: Is this a critical vulnerability?
+      options:
+        - label: This is a critical vulnerability (data exposure, remote code execution, etc.)
+          required: false
+        - label: I have read SECURITY.md and understand the responsible disclosure process
+          required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Vulnerability Description
+      description: Describe the security issue
+      placeholder: What is the security concern?
+    validations:
+      required: true
+
+  - type: dropdown
+    id: type
+    attributes:
+      label: Vulnerability Type
+      options:
+        - Authentication/Authorization
+        - Input Validation
+        - Injection (SQL, Command, etc.)
+        - Cryptographic Issue
+        - Dependency Vulnerability
+        - Information Disclosure
+        - Denial of Service
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: impact
+    attributes:
+      label: Potential Impact
+      description: What could an attacker do with this vulnerability?
+      placeholder: An attacker could...
+    validations:
+      required: true
+
+  - type: textarea
+    id: mitigation
+    attributes:
+      label: Suggested Mitigation
+      description: If you have ideas on how to fix this, please share
+      placeholder: This could be mitigated by...
+    validations:
+      required: false
+
+  - type: textarea
+    id: affected
+    attributes:
+      label: Affected Components
+      description: Which parts of the project are affected?
+      placeholder: |
+        - demo-shop: Login screen
+        - All apps: Session management
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Any other relevant information
+      placeholder: References, related CVEs, etc.

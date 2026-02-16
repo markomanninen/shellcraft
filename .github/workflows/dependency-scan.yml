@@ -1,0 +1,45 @@
+name: Dependency Security Scan
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  schedule:
+    - cron: '0 0 * * 0'  # Run weekly on Sunday at midnight
+
+jobs:
+  npm-audit:
+    name: NPM Audit
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    
+    strategy:
+      matrix:
+        app: [demo-shop, admin-dashboard, adventure-game, animation-demo]
+      fail-fast: false
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+    
+    - name: Run npm audit
+      working-directory: ${{ matrix.app }}
+      run: npm audit --audit-level=moderate
+      continue-on-error: true
+    
+    - name: Check for high severity vulnerabilities
+      working-directory: ${{ matrix.app }}
+      run: |
+        npm audit --audit-level=high
+        exit_code=$?
+        if [ $exit_code -ne 0 ]; then
+          echo "High severity vulnerabilities found!"
+          exit 1
+        fi
