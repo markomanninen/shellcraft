@@ -31,6 +31,11 @@ jobs:
     - name: Install dependencies
       working-directory: ${{ matrix.app }}
       run: npm ci
+      
+    - name: Generate SSH keys for E2E tests
+      if: matrix.app != 'animation-demo'
+      working-directory: ${{ matrix.app }}
+      run: npm run generate-keys
     
     - name: Run tests
       working-directory: ${{ matrix.app }}
