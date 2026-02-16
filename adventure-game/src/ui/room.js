@@ -1,6 +1,7 @@
 import { UIComponents } from './components.js';
 import { GameModel } from '../models/game.js';
 import { LLMGameEngine } from '../llm/game-engine.js';
+import { wizardAnimation } from './loading-animation.js';
 
 export class RoomScreen {
   constructor(context) {
@@ -20,6 +21,29 @@ export class RoomScreen {
     if (gameState.pendingResponse) {
       const resp = gameState.pendingResponse;
       delete gameState.pendingResponse;
+      // Save as last response for resume
+      gameState.lastResponse = resp;
+      this.renderRoom(
+        resp.room_name,
+        resp.description,
+        resp.items_here.length > 0
+          ? `Visible: ${resp.items_here.join(', ')}`
+          : 'No items visible',
+        resp.actions,
+        gameState,
+        null,
+        resp.message
+      );
+    } else if (gameState.llmEnabled && gameState.pendingAction) {
+      // Only call LLM when there's an action to process (or first turn)
+      this.renderLoading();
+      this.fetchLLMResponse(gameState);
+    } else if (gameState.llmEnabled && gameState.isFirstTurn) {
+      this.renderLoading();
+      this.fetchLLMResponse(gameState);
+    } else if (gameState.llmEnabled && gameState.lastResponse) {
+      // Resume: re-render the last LLM response without a new call
+      const resp = gameState.lastResponse;
       this.renderRoom(
         resp.room_name,
         resp.description,
@@ -32,6 +56,7 @@ export class RoomScreen {
         resp.message
       );
     } else if (gameState.llmEnabled) {
+      // Fallback: no last response cached, need to ask LLM
       this.renderLoading();
       this.fetchLLMResponse(gameState);
     } else {
@@ -49,28 +74,37 @@ export class RoomScreen {
   }
 
   renderLoading() {
-    UIComponents.createBox({
+    // Wizard animation box
+    const { frames, interval, color } = wizardAnimation;
+    const frameHeight = frames[0].length;
+    const frameWidth = frames[0][0].length;
+
+    const animBox = UIComponents.createBox({
       parent: this.screen,
-      top: 'center',
+      top: 2,
       left: 'center',
-      width: '60%',
-      height: 7,
-      content: '\n\n{center}{yellow-fg}The game master is thinking...{/}\n{center}{gray-fg}Please wait{/}',
+      width: frameWidth + 4,
+      height: frameHeight + 2,
+      label: ' The Wizard is thinking... ',
       tags: true,
-      style: { border: { fg: 'yellow' } }
+      border: { type: 'line' },
+      style: { border: { fg: color } },
+      align: 'center',
+      valign: 'middle'
     });
 
-    let dots = 0;
-    this.loadingInterval = setInterval(() => {
-      dots = (dots + 1) % 4;
-      const dotStr = '.'.repeat(dots);
-      if (this.alive && this.screen.children.length > 0) {
-        this.screen.children[0].setContent(
-          `\n\n{center}{yellow-fg}The game master is thinking${dotStr}{/}\n{center}{gray-fg}Please wait{/}`
-        );
-        this.screen.render();
-      }
-    }, 500);
+    let frameIndex = 0;
+    const renderFrame = () => {
+      if (!this.alive) return;
+      const frame = frames[frameIndex];
+      const content = frame.map(line => `{${color}-fg}${line}{/}`).join('\n');
+      animBox.setContent(content);
+      this.screen.render();
+      frameIndex = (frameIndex + 1) % frames.length;
+    };
+
+    renderFrame();
+    this.loadingInterval = setInterval(renderFrame, interval);
 
     UIComponents.createBox({
       parent: this.screen,
@@ -129,6 +163,7 @@ export class RoomScreen {
       }
 
       gameState.moves++;
+      this.context.saveGame();
 
       if (this.loadingInterval) {
         clearInterval(this.loadingInterval);
@@ -145,6 +180,7 @@ export class RoomScreen {
       }
 
       // Store response and re-navigate through the router for clean screen state
+      gameState.lastResponse = result.response;
       gameState.pendingResponse = result.response;
       this.context.navigate('room');
 
@@ -404,6 +440,7 @@ export class RoomScreen {
         gameState.currentRoom = nextRoomId;
         gameState.visitedRooms.add(nextRoomId);
         gameState.moves++;
+        this.context.saveGame();
         this.context.navigate('room');
       }
     } else if (action.startsWith('Take ')) {
@@ -412,6 +449,7 @@ export class RoomScreen {
       if (index > -1) {
         room.items.splice(index, 1);
         gameState.inventory.push(item);
+        this.context.saveGame();
         UIComponents.showMessage(this.screen, `Picked up: ${item}`, 'success');
         setTimeout(() => this.context.navigate('room'), 1500);
       }

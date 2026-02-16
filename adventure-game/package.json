@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "start": "node src/server/index.js",
+    "restart": "lsof -ti:2222 | xargs kill -9 2>/dev/null; node src/server/index.js",
     "dev": "nodemon src/server/index.js",
     "generate-keys": "node scripts/generate-keys.js",
     "test": "npm run test:unit && npm run test:e2e",

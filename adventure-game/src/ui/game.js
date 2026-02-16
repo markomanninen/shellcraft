@@ -120,6 +120,7 @@ export class GameScreen {
       llmEnabled: true,
       isFirstTurn: true
     };
+    this.context.saveGame();
     this.context.navigate('room');
   }
 }

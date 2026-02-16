@@ -24,48 +24,41 @@ class TerminalServer {
 
   handleClient(client) {
     console.log('Client connecting...');
-    
-    let publicKey = null;
-    
+
+    let username = null;
+
     client.on('authentication', (ctx) => {
-      if (ctx.method === 'publickey') {
-        publicKey = ctx.key;
-        ctx.accept();
-      } else if (ctx.method === 'none') {
-        // Allow anonymous access
-        ctx.accept();
-      } else {
-        ctx.reject();
-      }
+      // Capture username (always available — it's the SSH login name)
+      username = ctx.username;
+      // Accept any auth method — no password prompt
+      ctx.accept();
     });
 
     client.on('ready', () => {
-      console.log('Client authenticated');
-      
-      const session = this.sessionManager.createSession(publicKey);
-      
+      const session = this.sessionManager.createSession(username);
+      console.log(`Client authenticated as "${session.username}"`);
+
       client.on('session', (accept) => {
         const session_stream = accept();
         let ptyInfo = null;
-        
+
         session_stream.once('pty', (accept, reject, info) => {
           ptyInfo = info;
           accept && accept();
         });
-        
+
         session_stream.once('shell', (accept) => {
           const stream = accept();
-          
+
           // Initialize UI
-          this.router.handleConnection(stream, session, ptyInfo);
-          
+          this.router.handleConnection(stream, session, ptyInfo, this.sessionManager);
+
           stream.on('error', (err) => {
             console.error('Stream error:', err);
           });
-          
+
           stream.on('close', () => {
-            console.log('Client disconnected');
-            this.sessionManager.destroySession(session.id);
+            console.log(`Client disconnected (${session.username})`);
           });
         });
       });

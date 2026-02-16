@@ -16,7 +16,7 @@ export class CommandRouter {
     };
   }
 
-  handleConnection(stream, session, ptyInfo) {
+  handleConnection(stream, session, ptyInfo, sessionManager) {
     // CRITICAL: Set stream dimensions BEFORE creating blessed screen
     stream.columns = ptyInfo?.cols || 80;
     stream.rows = ptyInfo?.rows || 24;
@@ -49,6 +49,7 @@ export class CommandRouter {
     const context = {
       screen,
       session,
+      saveGame: () => sessionManager?.saveSession(session.id),
       navigate: (screenName, data) => {
         // Remove ALL 'key *' listeners, then re-register quit handler
         const keyEvents = Object.keys(screen._events || {}).filter(
