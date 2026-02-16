@@ -94,6 +94,43 @@ export function classifyAction(action) {
   return 'ACTION';
 }
 
+function normalizeMessage(value) {
+  if (typeof value !== 'string') return '';
+  return value.trim().replace(/\s+/g, ' ');
+}
+
+function canonicalMessage(value) {
+  return normalizeMessage(value)
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, '')
+    .trim();
+}
+
+export function combineOutcomeMessage(deterministicMessage, narrationMessage) {
+  const deterministic = normalizeMessage(deterministicMessage);
+  const narration = normalizeMessage(narrationMessage);
+
+  if (!deterministic) return narration;
+  if (!narration) return deterministic;
+
+  const deterministicCanonical = canonicalMessage(deterministic);
+  const narrationCanonical = canonicalMessage(narration);
+
+  if (deterministicCanonical === narrationCanonical) {
+    return deterministic;
+  }
+
+  if (narrationCanonical.includes(deterministicCanonical)) {
+    return narration;
+  }
+
+  if (deterministicCanonical.includes(narrationCanonical)) {
+    return deterministic;
+  }
+
+  return `${deterministic} ${narration}`.trim();
+}
+
 function buildActionLabel(action, index) {
   const slot = String(index + 1).padStart(2, ' ');
   const tag = classifyAction(action).padEnd(6, ' ');
@@ -229,7 +266,10 @@ export class RoomScreen {
 
       gameState.messageHistory = narration.messages;
       const turn = gameState.pendingTurn;
-      const combinedMessage = `${turn.outcome.message} ${narration.response.message}`.trim();
+      const combinedMessage = combineOutcomeMessage(
+        turn.outcome.message,
+        narration.response.message
+      );
       const response = {
         room_name: turn.room.name,
         description: narration.response.description,

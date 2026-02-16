@@ -3,7 +3,8 @@ import { strict as assert } from 'assert';
 import {
   validateRenderableResponse,
   buildMeterBar,
-  classifyAction
+  classifyAction,
+  combineOutcomeMessage
 } from '../../src/ui/room.js';
 
 describe('Room response validation', () => {
@@ -58,5 +59,29 @@ describe('Room UI helpers', () => {
     assert.strictEqual(classifyAction('Investigate the altar'), 'LOOK');
     assert.strictEqual(classifyAction('Take the amulet'), 'USE');
     assert.strictEqual(classifyAction('Back to menu'), 'SYSTEM');
+  });
+
+  it('deduplicates identical outcome messages', () => {
+    const merged = combineOutcomeMessage(
+      'You secure the sword and add it to your inventory.',
+      'You secure the sword and add it to your inventory.'
+    );
+    assert.strictEqual(merged, 'You secure the sword and add it to your inventory.');
+  });
+
+  it('uses longer message when one includes the other', () => {
+    const merged = combineOutcomeMessage(
+      'You secure the sword.',
+      'You secure the sword and add it to your inventory.'
+    );
+    assert.strictEqual(merged, 'You secure the sword and add it to your inventory.');
+  });
+
+  it('joins distinct outcome messages', () => {
+    const merged = combineOutcomeMessage(
+      'You parry the strike.',
+      'The guardian staggers backward.'
+    );
+    assert.strictEqual(merged, 'You parry the strike. The guardian staggers backward.');
   });
 });
