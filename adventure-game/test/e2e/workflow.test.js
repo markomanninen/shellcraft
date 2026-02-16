@@ -34,9 +34,10 @@ describe('Adventure Game Workflow', () => {
   it('should handle multiple concurrent sessions', () => {
     const sessionManager = new SessionManager();
     
-    // Create multiple sessions
-    const session1 = sessionManager.createSession(null);
-    const session2 = sessionManager.createSession(null);
+    // Create multiple sessions with different usernames
+    // (SessionManager reuses sessions for the same username for resume support)
+    const session1 = sessionManager.createSession('player1');
+    const session2 = sessionManager.createSession('player2');
     
     // Sessions should be independent
     assert.notStrictEqual(session1.id, session2.id, 'Sessions should have different IDs');
