@@ -19,7 +19,7 @@
   "dependencies": {
     "ssh2": "^1.15.0",
     "blessed": "^0.1.81",
-    "dotenv": "^16.4.5",
+    "dotenv": "^17.3.1",
     "nanoid": "^5.0.4"
   },
   "devDependencies": {
