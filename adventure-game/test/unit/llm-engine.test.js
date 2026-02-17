@@ -34,16 +34,16 @@ describe('LLMGameEngine', () => {
       );
     });
 
-    it('throws when description exceeds configured max length', () => {
+    it('truncates when description exceeds configured max length', () => {
       const engine = new LLMGameEngine();
       const payload = JSON.stringify({
-        description: 'x'.repeat(GAME_CONFIG.llm.descriptionMaxChars + 1),
+        description: 'x'.repeat(GAME_CONFIG.llm.descriptionMaxChars + 10),
         message: 'Too long'
       });
-      assert.throws(
-        () => engine.parseNarrationResponse(payload),
-        /description" exceeds/
-      );
+      
+      const result = engine.parseNarrationResponse(payload);
+      assert.strictEqual(result.description.length, GAME_CONFIG.llm.descriptionMaxChars);
+      assert.match(result.description, /\.{3}$/);
     });
   });
 
