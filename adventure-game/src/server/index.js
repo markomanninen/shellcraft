@@ -85,6 +85,23 @@ class TerminalServer {
       console.log(`Terminal server listening on ${HOST}:${PORT}`);
       console.log(`Connect with: ssh localhost -p ${PORT}`);
     });
+
+    const shutdown = () => {
+      console.log('\n[server] Shutting down...');
+      this.server.close(() => {
+        console.log('[server] Closed all connections.');
+        process.exit(0);
+      });
+      
+      // Force exit after timeout if connections hang
+      setTimeout(() => {
+        console.error('[server] Force exit due to timeout.');
+        process.exit(1);
+      }, 3000);
+    };
+
+    process.on('SIGINT', shutdown);
+    process.on('SIGTERM', shutdown);
   }
 }
 

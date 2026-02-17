@@ -163,7 +163,7 @@ export const GAME_CONFIG = deepFreeze({
   llm: {
     maxHistoryMessages: 40,
     requiredNarrationKeys: ['description', 'message'],
-    descriptionMaxChars: 320,
+    descriptionMaxChars: 500,
     actionCount: {
       min: 4,
       max: 6

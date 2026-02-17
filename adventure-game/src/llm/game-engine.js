@@ -87,9 +87,9 @@ RULES:
     }
 
     if (parsed.description.length > GAME_CONFIG.llm.descriptionMaxChars) {
-      throw new LLMResponseValidationError(
-        `[llm] "description" exceeds ${GAME_CONFIG.llm.descriptionMaxChars} chars`
-      );
+      // Warn and truncate instead of crashing
+      console.warn(`[llm] "description" exceeded limit (${parsed.description.length}/${GAME_CONFIG.llm.descriptionMaxChars}). Truncating.`);
+      parsed.description = parsed.description.slice(0, GAME_CONFIG.llm.descriptionMaxChars - 3) + '...';
     }
 
     if (typeof parsed.message !== 'string' || !parsed.message.trim()) {

@@ -4,6 +4,7 @@ import { RulesEngine } from '../models/rules-engine.js';
 import { normalizeGameState } from '../models/game-state.js';
 import { GAME_CONFIG } from '../config/game-config.js';
 import { wizardAnimation } from './loading-animation.js';
+import { generateMap } from './map-view.js';
 
 export function validateRenderableResponse(response) {
   if (!response || typeof response !== 'object') {
@@ -116,16 +117,33 @@ export function combineOutcomeMessage(deterministicMessage, narrationMessage) {
   const deterministicCanonical = canonicalMessage(deterministic);
   const narrationCanonical = canonicalMessage(narration);
 
+  // Exact match
   if (deterministicCanonical === narrationCanonical) {
     return deterministic;
   }
 
+  // Cross inclusion
   if (narrationCanonical.includes(deterministicCanonical)) {
     return narration;
   }
 
   if (deterministicCanonical.includes(narrationCanonical)) {
     return deterministic;
+  }
+
+  // Fuzzy match: check if they are "close enough" (e.g., share > 70% of words)
+  // This helps when LLM rephrases slightly but keeps the meaning, preventing "You took the sword. You pick up the sword."
+  const detWords = new Set(deterministicCanonical.split(' '));
+  const narWords = new Set(narrationCanonical.split(' '));
+  let intersection = 0;
+  for (const word of detWords) {
+    if (narWords.has(word)) intersection++;
+  }
+  const overlap = intersection / Math.min(detWords.size, narWords.size);
+  
+  if (overlap > 0.6) {
+    // If significant overlap, prefer narration as it's likely more flavorful
+    return narration;
   }
 
   return `${deterministic} ${narration}`.trim();
@@ -145,12 +163,75 @@ export class RoomScreen {
     this.rulesEngine = new RulesEngine();
     this.alive = true;
     this.loadingInterval = null;
+    this.showMap = false;
+    this.widgets = [];
+    this.activeListeners = [];
 
     this.context.session.gameState = normalizeGameState(this.context.session.gameState);
+    
+    // Bind methods
+    this.handleKey = this.handleKey.bind(this);
+    
     this.render();
   }
 
+  // Clear previous UI elements and listeners
+  cleanup() {
+    // Remove widgets
+    this.widgets.forEach(widget => {
+      widget.destroy();
+    });
+    this.widgets = [];
+
+    // Remove listeners
+    if (this.activeListeners.length > 0) {
+      this.activeListeners.forEach(({ keys, listener }) => {
+        // Handle array of keys or single key
+        const keyList = Array.isArray(keys) ? keys : [keys];
+        keyList.forEach(k => {
+          this.screen.unkey(k, listener);
+        });
+      });
+      this.activeListeners = [];
+    }
+    
+    // Clear loading interval if exists
+    if (this.loadingInterval) {
+      clearInterval(this.loadingInterval);
+      this.loadingInterval = null;
+    }
+  }
+
+  // Helper to register key listener and track it for cleanup
+  registerKey(keys, listener) {
+    // Ensure keys is an array
+    const keyList = Array.isArray(keys) ? keys : [keys];
+    // Register individually so we can unregister individually reliably
+    keyList.forEach(key => {
+      this.screen.key(key, listener);
+    });
+    this.activeListeners.push({ keys: keyList, listener });
+  }
+
+  // Handle generic input for list navigation if not caught by specific keys
+  handleInput(ch, key) {
+    if (this.screen.focused && this.screen.focused.type === 'list') {
+      if (key.name === 'j' || key.name === 'down') {
+         this.screen.focused.down();
+         this.screen.render();
+         return;
+      }
+      if (key.name === 'k' || key.name === 'up') {
+         this.screen.focused.up();
+         this.screen.render();
+         return;
+      }
+    }
+  }
+
   render() {
+    this.cleanup();
+
     const gameState = this.context.session.gameState;
 
     if (gameState.pendingError) {
@@ -208,6 +289,7 @@ export class RoomScreen {
       align: 'center',
       valign: 'middle'
     });
+    this.widgets.push(animBox);
 
     let frameIndex = 0;
     const renderFrame = () => {
@@ -222,7 +304,7 @@ export class RoomScreen {
     renderFrame();
     this.loadingInterval = setInterval(renderFrame, interval);
 
-    UIComponents.createBox({
+    const footer = UIComponents.createBox({
       parent: this.screen,
       bottom: 0,
       left: 0,
@@ -232,8 +314,9 @@ export class RoomScreen {
       tags: true,
       style: { fg: 'white' }
     });
+    this.widgets.push(footer);
 
-    this.screen.key(['h'], () => {
+    this.registerKey(['h'], () => {
       this.cleanupLoading();
       this.context.navigate('game');
     });
@@ -249,13 +332,24 @@ export class RoomScreen {
     }
   }
 
+  handleKey(ch, key) {
+    // Dummy handler if needed
+  }
+
+
   async fetchTurnNarration(gameState) {
     try {
       if (!gameState.pendingTurn) {
         const action = gameState.isFirstTurn
           ? '__start__'
           : (gameState.pendingAction || GAME_CONFIG.gameplay.genericActions[0]);
+        
+        // Pass the custom action flag to the RulesEngine via gameState
+        // The RulesEngine checks `gameState.pendingActionIsCustom`
         const turn = this.rulesEngine.resolveTurn(gameState, action);
+        
+        // Cleanup after rules processing
+        delete gameState.pendingActionIsCustom;
         gameState.pendingTurn = turn;
         delete gameState.pendingAction;
         this.context.saveGame();
@@ -341,7 +435,7 @@ export class RoomScreen {
     const leftPaneTop = topHeight + messageHeight;
     const actionsHeight = Math.max(4, lowerHeight - messageHeight);
 
-    UIComponents.createBox({
+    this.widgets.push(UIComponents.createBox({
       parent: this.screen,
       top: 0,
       left: 0,
@@ -351,27 +445,41 @@ export class RoomScreen {
       content: `\n  ${response.description}\n\n  ${roomMeta}`,
       tags: true,
       style: { border: { fg: 'yellow' } }
-    });
+    }));
 
-    UIComponents.createBox({
-      parent: this.screen,
-      top: 0,
-      left: '64%',
-      width: '36%',
-      height: topHeight,
-      label: ' Tactical Telemetry ',
-      content: `
-  HP      [${hpBar}] ${response.player.health}/${response.player.maxHealth}
-  Tension [${tensionBar}] ${response.director.tension}/${tensionMax}
-
-  ${encounterText}
-  Objective:
-  ${objectiveText}`,
-      style: { border: { fg: 'cyan' } }
-    });
+    if (this.showMap) {
+      this.widgets.push(UIComponents.createBox({
+        parent: this.screen,
+        top: 0,
+        left: '64%',
+        width: '36%',
+        height: topHeight + lowerHeight,
+        label: ' Regional Map ',
+        content: '\n' + generateMap(gameState),
+        tags: true,
+        style: { border: { fg: 'white' } }
+      }));
+    } else {
+      this.widgets.push(UIComponents.createBox({
+        parent: this.screen,
+        top: 0,
+        left: '64%',
+        width: '36%',
+        height: topHeight,
+        label: ' Tactical Telemetry ',
+        content: `
+      HP      [${hpBar}] ${response.player.health}/${response.player.maxHealth}
+      Tension [${tensionBar}] ${response.director.tension}/${tensionMax}
+    
+      ${encounterText}
+      Objective:
+      ${objectiveText}`,
+        style: { border: { fg: 'cyan' } }
+      }));
+    }
 
     if (displayMessage) {
-      UIComponents.createBox({
+      this.widgets.push(UIComponents.createBox({
         parent: this.screen,
         top: topHeight,
         left: 0,
@@ -381,7 +489,7 @@ export class RoomScreen {
         content: `  {green-fg}${displayMessage}{/}`,
         tags: true,
         style: { border: { fg: 'green' } }
-      });
+      }));
     }
 
     const invText = gameState.inventory.length > 0
@@ -389,14 +497,15 @@ export class RoomScreen {
       : 'Empty';
     const invDisplay = invText.length > 180 ? `${invText.slice(0, 177)}...` : invText;
 
-    UIComponents.createBox({
-      parent: this.screen,
-      top: rightPaneTop,
-      left: '64%',
-      width: '36%',
-      height: lowerHeight,
-      label: ' Field Notes ',
-      content: `
+    if (!this.showMap) {
+      this.widgets.push(UIComponents.createBox({
+        parent: this.screen,
+        top: rightPaneTop,
+        left: '64%',
+        width: '36%',
+        height: lowerHeight,
+        label: ' Field Notes ',
+        content: `
   ${itemsText}
 
   Inventory:
@@ -404,8 +513,9 @@ export class RoomScreen {
 
   Turn: ${gameState.moves}
   Last Outcome: ${response.action_outcome || 'n/a'}`,
-      style: { border: { fg: 'green' } }
-    });
+        style: { border: { fg: 'green' } }
+      }));
+    }
 
     const allActions = [
       ...response.actions,
@@ -423,7 +533,7 @@ export class RoomScreen {
       label: ' Tactical Actions ',
       items: actionItems,
       keys: false,
-      vi: false,
+      vi: false, // Turn off vi keys on the list itself to prevent conflict
       scrollable: true,
       alwaysScroll: true,
       scrollbar: {
@@ -436,6 +546,7 @@ export class RoomScreen {
         item: { fg: 'white' }
       }
     });
+    this.widgets.push(actions);
 
     let menuActive = false;
     const handleSelect = (index) => {
@@ -460,45 +571,50 @@ export class RoomScreen {
     actions.on('select', (_item, index) => handleSelect(index));
 
     const isEditing = () => this.screen.focused?.type === 'textbox';
-    UIComponents.createBox({
+    this.widgets.push(UIComponents.createBox({
       parent: this.screen,
       bottom: 0,
       left: 0,
       width: '100%',
       height: footerHeight,
-      content: `{center}Turn ${gameState.moves} | HP ${response.player.health}/${response.player.maxHealth} | Tension ${response.director.tension}/${tensionMax}{/}\n{center}{gray-fg}1-9=quick action | Enter=select | h=menu | i=inventory | j=journal | q=quit{/}`,
+      content: `{center}Turn ${gameState.moves} | HP ${response.player.health}/${response.player.maxHealth} | Tension ${response.director.tension}/${tensionMax}{/}\n{center}{gray-fg}1-9=quick action | Enter=select | h/b=menu | i=inv | j=jrnl | m=map | q=quit{/}`,
       tags: true,
       style: { fg: 'white' }
-    });
+    }));
 
-    this.screen.key(['h'], () => {
+    this.registerKey(['h', 'b', 'escape'], () => {
       if (isEditing()) return;
       this.context.navigate('game');
     });
-    this.screen.key(['i'], () => {
+    this.registerKey(['i'], () => {
       if (isEditing()) return;
       this.context.navigate('inventory');
     });
-    this.screen.key(['j'], () => {
+    this.registerKey(['j'], () => {
       if (isEditing()) return;
       this.context.navigate('journal');
     });
+    this.registerKey(['m'], () => {
+      if (isEditing()) return;
+      this.showMap = !this.showMap;
+      this.render();
+    });
 
-    this.screen.key(['up'], () => {
+    this.registerKey(['up'], () => {
       if (isEditing() || !menuActive) return;
       actions.up();
       this.screen.render();
     });
-    this.screen.key(['down'], () => {
+    this.registerKey(['down'], () => {
       if (isEditing() || !menuActive) return;
       actions.down();
       this.screen.render();
     });
-    this.screen.key(['enter'], () => {
+    this.registerKey(['enter'], () => {
       if (isEditing() || !menuActive) return;
       handleSelect(actions.selected);
     });
-    this.screen.key(['1', '2', '3', '4', '5', '6', '7', '8', '9'], (_ch, key) => {
+    this.registerKey(['1', '2', '3', '4', '5', '6', '7', '8', '9'], (_ch, key) => {
       if (isEditing() || !menuActive) return;
       const index = Number(key.name) - 1;
       if (Number.isInteger(index) && index >= 0 && index < allActions.length) {
@@ -532,6 +648,7 @@ export class RoomScreen {
       const text = value?.trim();
       if (text) {
         gameState.pendingAction = text;
+        gameState.pendingActionIsCustom = true;
         this.context.navigate('room');
         return;
       }
@@ -551,7 +668,7 @@ export class RoomScreen {
 
   renderError(error) {
     const message = (error.message || 'Unknown error').slice(0, 120);
-    UIComponents.createBox({
+    this.widgets.push(UIComponents.createBox({
       parent: this.screen,
       top: 'center',
       left: 'center',
@@ -561,19 +678,19 @@ export class RoomScreen {
       content: `\n  {red-fg}Turn narration failed.{/}\n\n  ${message}\n\n  {gray-fg}r=retry narration | h=menu{/}`,
       tags: true,
       style: { border: { fg: 'red' } }
-    });
+    }));
 
-    this.screen.key(['r'], () => {
+    this.registerKey(['r'], () => {
       this.context.navigate('room');
     });
-    this.screen.key(['h'], () => {
+    this.registerKey(['h'], () => {
       this.context.navigate('game');
     });
     this.screen.render();
   }
 
   renderGameOver(response) {
-    UIComponents.createBox({
+    this.widgets.push(UIComponents.createBox({
       parent: this.screen,
       top: 'center',
       left: 'center',
@@ -583,9 +700,9 @@ export class RoomScreen {
       content: `\n  ${response.description}\n\n  {bold}{yellow-fg}VICTORY - QUEST COMPLETE{/}\n\n  {gray-fg}Press Enter to return to menu{/}`,
       tags: true,
       style: { border: { fg: 'yellow' } }
-    });
+    }));
 
-    this.screen.key(['enter'], () => this.context.navigate('game'));
+    this.registerKey(['enter'], () => this.context.navigate('game'));
     this.screen.render();
   }
 }

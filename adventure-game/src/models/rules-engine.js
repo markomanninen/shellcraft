@@ -72,6 +72,13 @@ export class RulesEngine {
       return { type: 'start', raw: '__start__' };
     }
 
+    // CRITICAL: Check for explicit custom action flag set by UI FIRST
+    // This allows exact strings like "who is temple keeper" to bypass standard rule parsing
+    // and go straight to the narrative engine (handleCustom -> LLM).
+    if (gameState.pendingActionIsCustom) {
+      return { type: 'custom', raw: String(actionText ?? '') };
+    }
+
     const raw = String(actionText ?? '').trim();
     const normalized = normalizeToken(raw);
 
@@ -124,6 +131,15 @@ export class RulesEngine {
       return { type: 'wait', raw };
     }
 
+    // Detect open-ended questions or custom roleplay actions
+    if (
+      /^(who|what|where|when|why|how|can|is|are|tell|describe|narrate)\b/.test(normalized) ||
+      raw.endsWith('?') ||
+      gameState.pendingActionIsCustom // Flag set by UI
+    ) {
+      return { type: 'custom', raw };
+    }
+
     return { type: 'unknown', raw };
   }
 
@@ -147,6 +163,8 @@ export class RulesEngine {
         return this.handleWait();
       case 'quest':
         return this.handleQuestAction(action, gameState);
+      case 'custom':
+        return this.handleCustom(action, gameState);
       default:
         return this.handleUnknown(action, gameState);
     }
@@ -475,6 +493,18 @@ export class RulesEngine {
     };
   }
 
+  handleCustom(action, gameState) {
+    // Custom actions are passed to the narrative layer without strict rule enforcement
+    // We return 'success' to encourage the LLM to roleplay the outcome
+    return {
+      status: 'success',
+      message: '', // Empty message signals LLM to generate the full response based on action.raw
+      check: null,
+      inventoryUpdate: { add: [], remove: [] },
+      gameOver: false
+    };
+  }
+
   handleQuestAction(action, gameState) {
     if (action.target !== 'claim_treasure') {
       return {
@@ -545,6 +575,20 @@ export class RulesEngine {
   }
 
   handleUnknown(action, gameState) {
+    // If it's a question or complex action, let the LLM handle the flavor completely
+    // We provide a neutral 'success' so the LLM feels empowered to answer/narrate
+    const isQuestion = /^(who|what|where|when|why|how|can|is|are)\b/i.test(action.raw) || action.raw.endsWith('?');
+    
+    if (isQuestion) {
+      return {
+        status: 'success',
+        message: '', // Empty message signals LLM to generate the full response based on action.raw
+        check: null,
+        inventoryUpdate: { add: [], remove: [] },
+        gameOver: false
+      };
+    }
+
     const check = this.runSkillCheck(
       gameState,
       'perception',
