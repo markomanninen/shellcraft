@@ -52,6 +52,8 @@ export function ListItem({ label, hint, selected = false, disabled = false }) {
  * selectedIndex + onChange(index): controlled; without onChange the list
  *   keeps its own selection.
  * isActive: whether this list takes keys (the focused one).
+ * focused: false shows the list without a selection bar and takes no keys,
+ *   e.g. actions while the user types elsewhere or while waiting.
  * height: visible rows; longer lists scroll to keep the selection visible,
  *   with `↑ N more` / `↓ N more` in the first and last row.
  */
@@ -61,6 +63,7 @@ export function SelectList({
   onChange,
   onSelect,
   isActive = true,
+  focused = true,
   numberKeys = true,
   height
 }) {
@@ -81,10 +84,10 @@ export function SelectList({
         if (target < items.length && !items[target].disabled) select(target);
       }
     },
-    { isActive: isActive && items.length > 0 }
+    { isActive: isActive && focused && items.length > 0 }
   );
 
-  const following = useFollowSelection(items.length, height, index);
+  const following = useFollowSelection(items.length, height, focused ? index : 0);
   const layout = height
     ? scrollLayout(items.length, height, following)
     : { offset: 0, count: items.length, above: 0, below: 0, top: false, bottom: false };
@@ -101,7 +104,7 @@ export function SelectList({
         label: item.label,
         hint: item.hint,
         disabled: item.disabled,
-        selected: layout.offset + i === index
+        selected: focused && layout.offset + i === index
       })
     ),
     layout.bottom ? h(MoreIndicator, { key: 'down', direction: 'down', count: layout.below, indent: 3 }) : null
