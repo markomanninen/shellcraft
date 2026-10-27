@@ -289,9 +289,15 @@ translation: a local tty does that itself. Returns `cleanup()` with
 - `renderTerminal(element, { columns, rows })`: render on a fake terminal of
   that size; `text()`, `lines()`, `lastFrame()`, `press('down', 'enter', 'a')`,
   `resize(cols, rows)`, `unmount()`, `waitUntilExit()`.
-- `cleanupTerminals()`: unmount everything `renderTerminal` mounted; call
-  it in `afterEach` so a failing test cannot leave a spinner or interval
-  keeping the process alive.
+- `cleanupTerminals()`: unmount everything `renderTerminal` mounted and end
+  every `serve()` / `renderLocal()` session still running; call it in
+  `afterEach`. A test that fails halfway otherwise leaves its app mounted,
+  and a live spinner, `useInterval` or animation keeps the test process
+  alive after the last test: the run never ends. (The shellcraft test
+  scripts also pass `--test-force-exit` as a safety net.)
+- `waitFor(predicate, { timeout, interval, message })`: poll until a
+  condition holds, e.g. a text in a fake SSH channel's output, instead of
+  sleeping a fixed time that a loaded machine overruns.
 - `styleAt(rawFrame, text)`: `{ fg, bg, bold, dim, underline }` of a text on
   screen; `styleAtCell(rawFrame, row, column)` for a cell.
 - `boldDimText(rawFrame)`: characters that are bold and dim at once (should

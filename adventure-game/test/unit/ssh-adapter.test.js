@@ -1,6 +1,14 @@
-import { describe, it, before, after } from 'node:test';
+import { describe, it, before, after, afterEach } from 'node:test';
 import { strict as assert } from 'assert';
-import { FakeSshChannel, FakeSshSession, stripAnsi, keys, tick } from '@shellcraft/ui/testing';
+import {
+  FakeSshChannel,
+  FakeSshSession,
+  cleanupTerminals,
+  waitFor,
+  stripAnsi,
+  keys,
+  tick
+} from '@shellcraft/ui/testing';
 import { CommandRouter } from '../../src/server/router.js';
 import { stubLlm, tempSessions } from '../helpers/adventure.js';
 
@@ -19,6 +27,17 @@ after(() => {
   store.remove();
 });
 
+// A test that fails halfway would leave its session mounted, with the busy
+// spinner animating forever: the file's process would never exit.
+const gates = [];
+afterEach(() => {
+  for (const llm of gates.splice(0)) llm.release();
+  cleanupTerminals();
+});
+
+/** Output the client has received and not taken yet, without ANSI codes. */
+const pending = (channel) => stripAnsi(channel.output.join(''));
+
 // The router hands the SSH channel to the ui package's serve(); check the
 // bytes a client would receive, with a fake duplex stream as the channel
 // and a stub LLM (nothing calls Ollama).
@@ -28,9 +47,10 @@ describe('SSH adapter (fake channel)', () => {
     const sshSession = new FakeSshSession();
     const session = store.manager.createSession('ssh-player');
     const llm = stubLlm({ gate: true });
+    gates.push(llm);
     const router = new CommandRouter({ llm });
     const cleanup = router.handleConnection(channel, session, { cols: 80, rows: 24 }, store.manager, sshSession);
-    await tick(80);
+    await waitFor(() => pending(channel).includes('Start new adventure'), { message: 'the menu' });
 
     let out = channel.takeOutput();
     assert.ok(out.startsWith('\u001B[?1049h'), 'alternate screen');
@@ -40,18 +60,23 @@ describe('SSH adapter (fake channel)', () => {
     assert.ok(stripAnsi(out).includes('Start new adventure'));
 
     channel.type(keys.enter);
-    await tick(80);
-    out = stripAnsi(channel.takeOutput());
-    assert.ok(out.includes('The Game Master is thinking'), out);
+    await waitFor(() => pending(channel).includes('The Game Master is thinking'), { message: 'the busy message' });
+    channel.takeOutput();
+    await waitFor(() => llm.pending() === 1, { message: 'the LLM call' });
     llm.release();
-    await tick(80);
-    out = stripAnsi(channel.takeOutput());
-    assert.ok(out.includes('Lanterns sway over the village square.'), out);
+    await waitFor(() => pending(channel).includes('Lanterns sway over the village square.'), { message: 'the narration' });
+    await waitFor(() => store.read().some((entry) => entry.username === 'ssh-player' && entry.gameState), { message: 'the save' });
+    channel.takeOutput();
     assert.equal(session.gameState.moves, 1);
     assert.ok(store.read().some((entry) => entry.username === 'ssh-player' && entry.gameState), 'saved');
 
     assert.equal(sshSession.windowChange(100, 30), true);
-    await tick(80);
+    // A synchronized frame drawn after the clear: the full redraw.
+    const redrawn = () => {
+      const raw = channel.output.join('');
+      return raw.indexOf('\u001B[?2026l', raw.indexOf('\u001B[2J')) > raw.indexOf('\u001B[2J') && raw.includes('\u001B[2J');
+    };
+    await waitFor(redrawn, { message: 'the redraw at 100x30' });
     assert.equal(channel.columns, 100);
     assert.equal(channel.rows, 30);
     out = channel.takeOutput();
@@ -72,23 +97,23 @@ describe('SSH adapter (fake channel)', () => {
     const session = store.manager.createSession('ssh-other');
     const a = new FakeSshChannel((_t, cb) => cb());
     const cleanupA = new CommandRouter({ llm: stubLlm() }).handleConnection(a, session, null, store.manager);
-    await tick(50);
+    await waitFor(() => pending(a).includes('Start new adventure'), { message: 'the menu' });
     a.type(keys.ctrlC);
     await cleanupA.exited;
     assert.equal(a.writableEnded, true);
 
     const llm = stubLlm({ gate: true });
+    gates.push(llm);
     const b = new FakeSshChannel((_t, cb) => cb());
     const cleanupB = new CommandRouter({ llm }).handleConnection(b, session, { cols: 80, rows: 24 }, store.manager);
-    await tick(50);
+    await waitFor(() => pending(b).includes('Start new adventure'), { message: 'the menu' });
     b.type(keys.enter); // start a game: the LLM is now busy
-    await tick(50);
-    assert.equal(llm.pending(), 1);
+    await waitFor(() => llm.pending() === 1, { message: 'the LLM call' });
     assert.doesNotThrow(() => b.disconnect());
     await cleanupB.exited;
     llm.release(); // the narration arrives after the client left
-    await tick(50);
+    await waitFor(() => session.gameState?.lastResponse?.room_name === 'Village Square', { message: 'the saved turn' });
+    await tick(20);
     assert.equal(b.writesAfterClose, 0);
-    assert.equal(session.gameState.lastResponse.room_name, 'Village Square', 'the turn is still saved');
   });
 });

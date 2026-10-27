@@ -6,6 +6,7 @@ import './color.js';
 import { EventEmitter } from 'node:events';
 import { Duplex } from 'node:stream';
 import { render } from 'ink';
+import { liveSessions } from './fullscreen.js';
 
 export const keys = Object.freeze({
   up: '\u001B[A',
@@ -154,9 +155,11 @@ class FakeStdin extends EventEmitter {
 const mounted = new Set();
 
 /**
- * Unmount everything renderTerminal() mounted and is still mounted. Call it
- * from afterEach, so a failing test cannot leave an animated tree (spinner)
- * keeping the test process alive.
+ * Unmount everything renderTerminal() mounted and end every serve() or
+ * renderLocal() session still running. Call it from afterEach: a test that
+ * fails halfway would otherwise leave its app mounted, and an animated tree
+ * (a busy spinner, a useInterval refresh) keeps the test process alive after
+ * the last test, so the run never ends.
  */
 export function cleanupTerminals() {
   for (const instance of mounted) {
@@ -167,6 +170,28 @@ export function cleanupTerminals() {
     }
   }
   mounted.clear();
+  for (const cleanup of [...liveSessions]) {
+    try {
+      cleanup();
+    } catch {
+      // Already gone.
+    }
+  }
+}
+
+/**
+ * Wait until `predicate()` is true (polling every `interval` ms) or fail
+ * after `timeout` ms with `message`. For tests that drive a serve() or
+ * renderLocal() session, instead of sleeping a fixed time and hoping the
+ * frame is there on a loaded machine.
+ */
+export async function waitFor(predicate, { timeout = 3000, interval = 10, message = 'condition' } = {}) {
+  const deadline = Date.now() + timeout;
+  for (;;) {
+    if (predicate()) return;
+    if (Date.now() > deadline) throw new Error(`Timed out after ${timeout} ms waiting for ${message}`);
+    await new Promise((resolve) => setTimeout(resolve, interval));
+  }
 }
 
 /**

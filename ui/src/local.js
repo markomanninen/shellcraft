@@ -1,4 +1,4 @@
-import { startFullScreen, prepareInput, toSize } from './fullscreen.js';
+import { startFullScreen, prepareInput, toSize, liveSessions } from './fullscreen.js';
 
 /**
  * Full-screen Ink on the local terminal (process.stdin/stdout), for apps
@@ -62,6 +62,7 @@ export function renderLocal(element, options = {}) {
     finished = true;
     stdout.removeListener('resize', onResize);
     screen.leave();
+    liveSessions.delete(cleanup);
     resolveExited();
     if (typeof onExit === 'function') onExit();
   }
@@ -77,6 +78,7 @@ export function renderLocal(element, options = {}) {
   }
 
   screen.exitPromise.then(finish, finish);
+  liveSessions.add(cleanup);
 
   cleanup.exited = exited;
   cleanup.instance = instance;

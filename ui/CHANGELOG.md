@@ -30,6 +30,9 @@ Pieces the four app ports had built locally, moved here. Everything from
 - Exports: `wrappedRowCount`, `layoutLines`, `maxScrollOffset`,
   `scrollLayout`, `wrapSegments`, `truncateToWidth`, `hintsWidth`.
 - README: SSH authentication and the vendored copy (`init.sh`).
+- Testing: `waitFor(predicate, options)`; `cleanupTerminals()` also ends
+  `serve()` and `renderLocal()` sessions a failed test left running (their
+  timers kept the test process alive).
 
 ### Changed
 

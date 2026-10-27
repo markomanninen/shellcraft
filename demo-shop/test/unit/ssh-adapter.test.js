@@ -1,8 +1,12 @@
-import { describe, it } from 'node:test';
+import { describe, it, afterEach } from 'node:test';
 import { strict as assert } from 'assert';
-import { FakeSshChannel, FakeSshSession, stripAnsi, keys, tick } from '@shellcraft/ui/testing';
+import { cleanupTerminals, FakeSshChannel, FakeSshSession, stripAnsi, keys, tick } from '@shellcraft/ui/testing';
 import { CommandRouter } from '../../src/server/router.js';
 import { SessionManager } from '../../src/server/session.js';
+
+// A test that fails halfway would leave its session mounted; a live timer
+// in it (spinner, refresh, animation) would keep this file's process alive.
+afterEach(() => cleanupTerminals());
 
 // The router hands the SSH channel to the ui package's serve(); check the
 // bytes a client would receive, with a fake duplex stream as the channel.

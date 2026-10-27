@@ -1,4 +1,4 @@
-import { startFullScreen, prepareInput, toSize, ENTER_ALT_SCREEN, LEAVE_ALT_SCREEN } from './fullscreen.js';
+import { startFullScreen, prepareInput, toSize, liveSessions, ENTER_ALT_SCREEN, LEAVE_ALT_SCREEN } from './fullscreen.js';
 
 export { ENTER_ALT_SCREEN, LEAVE_ALT_SCREEN };
 
@@ -130,6 +130,7 @@ export function serve(stream, ptyInfo, element, options = {}) {
     } catch {
       // Not a readable stream.
     }
+    liveSessions.delete(cleanup);
     resolveExited();
     if (typeof onExit === 'function') onExit();
   }
@@ -156,6 +157,7 @@ export function serve(stream, ptyInfo, element, options = {}) {
   }
 
   screen.exitPromise.then(finish, finish);
+  liveSessions.add(cleanup);
   stream.on('close', onClose);
   if (session) session.on('window-change', onWindowChange);
 

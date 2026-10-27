@@ -1,12 +1,16 @@
 // The app as it runs: run() → renderLocal() on a fake TTY whose output goes
 // into a headless xterm, so this is what the terminal would show.
-import { describe, it } from 'node:test';
+import { describe, it, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import xterm from '@xterm/headless';
-import { createFakeTty, boldDimText, tick } from '@shellcraft/ui/testing';
+import { cleanupTerminals, createFakeTty, boldDimText, tick } from '@shellcraft/ui/testing';
 import { run } from '../app.js';
+
+// A test that fails halfway would leave its session mounted; a live timer
+// in it (spinner, refresh, animation) would keep this file's process alive.
+afterEach(() => cleanupTerminals());
 
 const { Terminal } = xterm;
 

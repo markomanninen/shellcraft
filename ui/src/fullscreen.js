@@ -15,6 +15,14 @@ export const ERASE_SCREEN = `${ESC}2J`;
 export const SHOW_CURSOR = `${ESC}?25h`;
 export const RESET_STYLE = `${ESC}0m`;
 
+/**
+ * Cleanup functions of the serve()/renderLocal() sessions still running.
+ * A server never needs it; the testing helpers end what a failed test left
+ * behind (cleanupTerminals), so a spinner or interval cannot keep the test
+ * process alive.
+ */
+export const liveSessions = new Set();
+
 export const toSize = (value, fallback) => {
   const n = Number(value);
   return Number.isInteger(n) && n > 0 ? n : fallback;

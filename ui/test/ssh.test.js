@@ -1,12 +1,16 @@
-import { describe, it } from 'node:test';
+import { describe, it, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import React, { useState } from 'react';
 import xterm from '@xterm/headless';
 import { serve, toCrlf, Screen, Panel, SelectList, Text, useApp, useInput } from '../src/index.js';
-import { tick, keys } from '../src/testing.js';
+import { cleanupTerminals, tick, keys } from '../src/testing.js';
 import { FakeSshChannel as FakeChannel, FakeSshSession as FakeSession } from '../src/testing.js';
+
+// A test that fails halfway would leave its session mounted; a live timer
+// in it (spinner, refresh, animation) would keep this file's process alive.
+afterEach(() => cleanupTerminals());
 
 const { Terminal } = xterm;
 const h = React.createElement;
