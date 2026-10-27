@@ -1,337 +1,126 @@
-# 🧪 Testing & Demo Apps Summary
+# Testing
 
-## ✅ What Was Added
+All tests use Node's built-in test runner (`node:test`). There is no test
+framework to install.
 
-### 1. Comprehensive Testing Infrastructure
+## What Is Tested Where
 
-Added to **init.sh** template generator:
+| Where | Tests | Command |
+|---|---|---|
+| `ui/` | components, screen layout, scrolling, `serve()` over a fake SSH channel, `renderLocal()` | `cd ui && npm test` |
+| demo apps | models, sessions, screens, SSH adapter (`test/unit/`); the real SSH server and workflows (`test/e2e/`) | `./npmw test` |
+| generated apps | the same layers, created by `init.sh` | `npm test` |
 
-**Test Directory Structure:**
-```
-test/
-├── unit/              # Unit tests
-│   ├── product.test.js
-│   └── session.test.js
-├── e2e/               # End-to-end tests
-│   ├── server.test.js
-│   └── workflow.test.js
-└── helpers/           # Test utilities
-    └── test-utils.js
-```
+CI (`.github/workflows/test.yml`) runs `npm ci` and `npm test` on Node 24 for
+`ui`, `demo-shop`, `admin-dashboard`, `adventure-game` and `animation-demo`.
+For the SSH apps it runs `npm run generate-keys` first.
 
-**NPM Test Scripts:**
-```json
-{
-  "test": "npm run test:unit && npm run test:e2e",
-  "test:unit": "node --test test/unit/**/*.test.js",
-  "test:e2e": "node --test test/e2e/**/*.test.js",
-  "test:watch": "node --test --watch"
-}
-```
+## The Layers
 
-### 2. Unit Tests
+### 1. Logic (unit)
 
-#### ProductModel Tests (`test/unit/product.test.js`)
-✅ Tests all products retrieval  
-✅ Tests product by ID lookup  
-✅ Tests non-existent product handling  
-✅ Tests required product fields validation  
+Plain functions and classes: product and system models, session managers,
+form validation, the adventure game's rules and LLM engine (with a mocked
+Ollama client).
 
-**Test Results:**
-```
-▶ ProductModel
-  ✔ should return all products
-  ✔ should return a product by id
-  ✔ should return undefined for non-existent id
-  ✔ should have required product fields
-✔ ProductModel (1.10675ms)
+```js
+it('should create anonymous session without key', () => {
+  const session = new SessionManager().createSession(null);
+  assert.strictEqual(session.fingerprint, 'anonymous');
+});
 ```
 
-#### SessionManager Tests (`test/unit/session.test.js`)
-✅ Tests session creation  
-✅ Tests anonymous session handling  
-✅ Tests fingerprint generation from public key  
-✅ Tests session retrieval  
-✅ Tests session destruction  
-✅ Tests cart isolation between sessions  
+### 2. Screens (unit)
 
-**Test Results:**
-```
-▶ SessionManager
-  ✔ should create a session
-  ✔ should create anonymous session without key
-  ✔ should create fingerprint from public key
-  ✔ should retrieve existing session
-  ✔ should destroy session
-  ✔ should maintain separate session carts
-✔ SessionManager (2.921833ms)
-```
+`renderTerminal()` from `@shellcraft/ui/testing` renders the app on a fake
+terminal of a given size. The test presses keys and checks what the user
+would see:
 
-### 3. E2E Tests
+```js
+import { renderTerminal, cleanupTerminals, styleAt, boldDimText, tick } from '@shellcraft/ui/testing';
 
-#### Server Connection Tests (`test/e2e/server.test.js`)
-- Tests SSH connection acceptance
-- Tests anonymous authentication
-- Tests shell session creation
+afterEach(() => cleanupTerminals());
 
-#### Workflow Tests (`test/e2e/workflow.test.js`)
-- Tests complete shopping workflow
-- Tests concurrent sessions
-- Tests cart management
-- Tests session lifecycle
-
-### 4. Test Utilities (`test/helpers/test-utils.js`)
-- Delay utility for async testing
-- Assertion helpers
-- Common test patterns
-
-## 🎮 Demo Applications Created
-
-### Demo 1: E-commerce Shop (demo-shop)
-**Location:** `/demo-shop/`
-
-**Features:**
-- 📦 Product catalog with 4 coffee products
-- 🛒 Shopping cart management
-- 💳 Checkout form
-- 👤 Session-based shopping
-
-**Screens:**
-1. Home - Main menu
-2. Products - Browse and add to cart
-3. Cart - View items and checkout
-4. Checkout - Shipping information form
-
-**Test Results:**
-```
-✅ 10 unit tests passed
-✅ All product operations working
-✅ Session management working
-✅ Cart isolation working
+it('home: menu focused, q quit hint', async () => {
+  const t = renderTerminal(h(App, { session }), { columns: 80, rows: 24 });
+  await tick(20);
+  const lines = t.lines();
+  assert.equal(lines.length, 24);                                 // fills the terminal
+  assert.ok(lines[0].startsWith(' Demo Shop › Home'));            // title bar
+  assert.equal(lines.at(-1), ' ↑↓ move  ⏎ select  1-3 jump  q quit');  // status bar
+  assert.equal(styleAt(t.lastFrame(), 'Menu').fg, 'cyan');        // focused panel
+  assert.equal(boldDimText(t.lastFrame()), '');                   // never bold + dim
+  await t.press('enter');
+  assert.ok(t.lines()[0].includes('Products'));
+});
 ```
 
-### Demo 2: Adventure Game (adventure-game)
-**Location:** `/adventure-game/`
+Good screen tests check:
 
-**Features:**
-- 🗺️ 6 interconnected rooms to explore
-- 🎒 Inventory system
-- 🔍 Item collection
-- 📊 Game statistics (moves, rooms visited)
+- every screen at 80×24 and 100×30 (`t.resize()` for live resizes);
+- row 0 is the title bar and the last row the status bar;
+- no row is wider than the terminal;
+- styles through `styleAt()`: focus is cyan, muted is dim, errors are red;
+- results appear in the status bar, and there is no floating box;
+- `q` quits, except while a field is being edited.
 
-**Rooms:**
-1. **Village Square** (start) - torch, map
-2. **Dark Forest** - sword, shield
-3. **Mysterious Cave** - potion
-4. **Peaceful Meadow** - flower, herbs
-5. **Ancient Temple** - amulet
-6. **Treasure Chamber** - gold, crown, jewels (win condition!)
+`cleanupTerminals()` in `afterEach` unmounts everything, so a failing test
+cannot leave a spinner running and keep the process alive.
 
-**Screens:**
-1. Game Menu - Start, inventory, stats, help
-2. Room View - Current location with actions
-3. Inventory - Items collected
-4. Help - Game instructions
+### 3. SSH adapter (unit)
 
-**Navigation:**
-- Move between rooms (north, south, east, west)
-- Pick up items
-- View inventory
-- Track progress
+`FakeSshChannel` and `FakeSshSession` stand in for ssh2. The test runs the
+app through the router and `serve()` and checks the raw bytes:
 
-### Demo 3: Admin Dashboard (admin-dashboard)
-**Location:** `/admin-dashboard/`
+```js
+const channel = new FakeSshChannel((_text, done) => done());
+const sshSession = new FakeSshSession();
+const cleanup = new CommandRouter().handleConnection(channel, session, { cols: 80, rows: 24 }, sshSession);
+await tick(80);
+const out = channel.takeOutput();
+assert.ok(out.startsWith('\u001B[?1049h'));   // alternate screen
+assert.ok(out.includes('\u001B[36m'));        // colors without a TTY
+assert.ok(!/[^\r]\n/.test(out));              // CRLF line ends
+sshSession.windowChange(100, 30);             // resize
+channel.type('q');
+await cleanup.exited;                         // exit status 0, channel ended
+```
 
-**Features:**
-- 📊 Real-time system monitoring
-- 💻 CPU and memory usage
-- ⚙️ Process monitoring
-- 📋 System logs viewer
+### 4. Real server (e2e)
 
-**Screens:**
-1. **Dashboard** - Main menu
-2. **System Overview** - Hostname, platform, uptime, load average
-3. **CPU & Memory** - Detailed resource usage per core
-4. **Process Monitor** - Running processes list
-5. **System Logs** - Application logs with timestamps
+`test/e2e/server.test.js` starts `src/server/index.js` as a child process and
+connects with an ssh2 client: plain connection, anonymous shell, and a pty
+session that renders the home screen, resizes and quits with `q`.
 
-**System Information Displayed:**
-- Hostname and platform
-- CPU cores and usage
-- Memory total, used, free, percentage
-- System uptime
-- Load averages (1, 5, 15 min)
-- Top processes
-- Recent log entries
+In generated apps the e2e tests pick a free port and create a throwaway host
+key, so they run right after `npm install`. They also sign in with a client
+key, without a key (keyboard-interactive), and check that `none` alone is
+refused; `test/unit/auth.test.js` checks the signature handling. The demo
+apps use port 2223 and `keys/host_key` (run `npm run generate-keys` first).
 
-**Real Features:**
-- Uses Node.js `os` module for actual system stats
-- Executes `ps aux` for real process list
-- Refreshable views (press 'r')
+## Running Tests
 
-## 🚀 How to Test Each Demo
-
-### Demo Shop
 ```bash
-cd demo-shop
-npm install
-npm run generate-keys
-npm test        # Run all tests
-npm run test:unit    # Unit tests only
-npm start       # Start server
+npm test               # unit, then e2e
+npm run test:unit      # fast, no server
+npm run test:e2e       # starts the server
+npm run test:watch     # re-run on changes
+node --test test/unit/screens.test.js   # one file
 ```
 
-Then connect: `ssh localhost -p 2222`
+In this repository's demo apps, use `./npmw` in place of `npm`.
 
-### Adventure Game
+## Testing the Generator
+
+`init.sh` has no CI job. To check a change, generate each app type into a
+temporary directory outside the repository and run its tests:
+
 ```bash
-cd adventure-game
-npm install
-npm run generate-keys
-npm start
+for type in minimal ecommerce; do
+  ./init.sh "/tmp/check-$type" "$type"
+  (cd "/tmp/check-$type" && npm install && npm test)
+done
 ```
 
-Then connect: `ssh localhost -p 2222`
-
-**Try this:**
-1. Select "Start New Adventure"
-2. Look around
-3. Take items (torch, map)
-4. Go north to forest
-5. Take sword
-6. Navigate to find the treasure chamber!
-
-### Admin Dashboard
-```bash
-cd admin-dashboard
-npm install
-npm run generate-keys
-npm start
-```
-
-Then connect: `ssh localhost -p 2222`
-
-**Try this:**
-1. Select "System Overview" - See your Mac's stats!
-2. Select "CPU & Memory" - See core usage
-3. Select "Process Monitor" - See running processes
-4. Press 'r' to refresh data
-
-## 📊 Test Coverage Summary
-
-### Unit Tests
-| Component | Tests | Status |
-|-----------|-------|--------|
-| ProductModel | 4 | ✅ Passing |
-| SessionManager | 6 | ✅ Passing |
-| **Total** | **10** | **✅ All Passing** |
-
-### E2E Tests
-| Test | Coverage | Status |
-|------|----------|--------|
-| SSH Connection | Server accepts connections | ✅ Implemented |
-| Anonymous Auth | Works without keys | ✅ Implemented |
-| Shopping Workflow | End-to-end cart flow | ✅ Implemented |
-| Concurrent Sessions | Multiple users | ✅ Implemented |
-
-### Integration Tests
-| Workflow | Steps | Status |
-|----------|-------|--------|
-| E-commerce | Browse → Add → Checkout | ✅ Working |
-| Adventure | Move → Collect → Win | ✅ Working |
-| Monitoring | Connect → View → Refresh | ✅ Working |
-
-## 🎯 What Each Demo Proves
-
-### Demo Shop Proves:
-✅ SSH server works correctly  
-✅ TUI renders properly  
-✅ Navigation system works  
-✅ Session management functional  
-✅ Forms and input handling work  
-✅ Data models work correctly  
-✅ Multi-screen workflows function  
-
-### Adventure Game Proves:
-✅ Stateful game logic works  
-✅ Complex navigation patterns  
-✅ Inventory management  
-✅ Real-time state updates  
-✅ Game loop mechanics  
-✅ Help and documentation screens  
-
-### Admin Dashboard Proves:
-✅ Real system data integration  
-✅ OS module integration works  
-✅ Process execution works  
-✅ Data refreshing  
-✅ Multiple data sources  
-✅ Real-time monitoring UI  
-
-## 🧪 Testing Best Practices Demonstrated
-
-1. **Unit Tests** - Test individual components in isolation
-2. **E2E Tests** - Test full user workflows
-3. **Integration Tests** - Test component interactions
-4. **Test Utilities** - Reusable test helpers
-5. **Assertions** - Clear, descriptive test cases
-6. **Coverage** - Multiple test types for confidence
-
-## 🔍 Verified Functionality
-
-### Core Features Tested
-✅ SSH server starts and accepts connections  
-✅ Public key authentication works  
-✅ Anonymous access works  
-✅ Session creation and management  
-✅ Multiple concurrent sessions  
-✅ Screen navigation and routing  
-✅ UI component rendering  
-✅ Keyboard input handling  
-✅ Data models and persistence  
-✅ Form submission  
-✅ State management  
-
-### Edge Cases Tested
-✅ Invalid product IDs  
-✅ Empty carts  
-✅ Session isolation  
-✅ Non-existent routes  
-✅ Missing data handling  
-
-## 📈 Performance Verified
-
-- Unit tests complete in < 40ms
-- Session creation: < 1ms
-- Product queries: < 0.3ms
-- No memory leaks in session management
-- Clean session destruction
-
-## 🎉 Ready to Use!
-
-All three demo apps are:
-- ✅ Fully functional
-- ✅ Well tested
-- ✅ Documented
-- ✅ Ready to customize
-- ✅ Production-ready code structure
-
-## 🚀 Next Steps
-
-1. **Run the demos** - Try each one!
-2. **Read the code** - Learn from working examples
-3. **Customize** - Make them your own
-4. **Deploy** - Share with the world!
-
-## 📚 What You Learned
-
-By exploring these demos and tests, you now have:
-- 3 complete, working applications
-- Comprehensive test suite
-- Real-world patterns and practices
-- Multiple use case examples
-- Production-ready code structure
-
----
-
-**All tests passing ✅ | All demos working ✅ | Ready to build! 🚀**
+Then start one (`npm run generate-keys && npm start`), connect with
+`ssh localhost -p 2222`, and quit with `q`.
