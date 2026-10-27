@@ -79,8 +79,10 @@ Run the tests of every app that uses what you changed.
 
 ### Changing the Generator
 
-`init.sh` has no CI job. Generate each app type outside the repository and
-run its tests:
+The Generator workflow (`.github/workflows/generator.yml`) generates both app
+types and runs their tests when `init.sh`, `quick-start.sh` or `ui/` change.
+To check locally, generate each app type outside the repository and run its
+tests:
 
 ```bash
 ./init.sh /tmp/check-minimal minimal
@@ -91,6 +93,28 @@ cd /tmp/check-shop && npm install && npm test
 
 Keep `init.sh` a bash script that works with bash 3.2 (macOS) and without
 GNU-only flags (Linux and macOS). Run `shellcheck init.sh`.
+
+### README Recordings
+
+The animated terminals in the READMEs (`docs/images/*.svg`) are recorded from
+the real apps, not from a screen recorder:
+
+```bash
+(cd demo-shop && npm ci) # and the same in admin-dashboard, adventure-game, animation-demo
+node scripts/record-readme.mjs              # all four apps
+node scripts/record-readme.mjs demo-shop    # one app
+```
+
+`scripts/record-readme.mjs` drives each app with `renderTerminal()` from
+`@shellcraft/ui/testing` at 80×24 (adventure-game with the stub LLM from its
+tests, admin-dashboard with its demo system data), keeps every distinct
+screen with how long it stays up, and writes an SVG: text runs placed by
+column, box lines and blocks as shapes, the VS Code Dark+ terminal colors,
+dim as opacity, and one CSS `@keyframes` animation that steps through the
+frames. No scripts and no external fonts or files, so GitHub shows it in an
+`<img>`. Identical rows and frames are stored once. Re-record after a change
+that alters what the apps look like; the scenarios are at the bottom of the
+script.
 
 ### Running Tests
 
@@ -281,6 +305,7 @@ All pull requests automatically run:
 - **QUICK_REFERENCE.md**: Quick reference guide
 - **DESIGN_PRINCIPLES.md**: Screen rules and Ink over SSH
 - **ui/README.md**: The shared components, theme and test helpers
+- **docs/images/**: README recordings (`scripts/record-readme.mjs`)
 - **SECURITY.md**: Security policies and guidelines
 - **INDEX.md**: All documents
 

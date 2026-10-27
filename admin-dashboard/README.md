@@ -2,9 +2,13 @@
 
 A terminal-based system monitoring dashboard accessible over SSH. Built with [ssh2](https://github.com/mscdex/ssh2) and [Ink](https://github.com/vadimdemedes/ink) (through the shared [`@shellcraft/ui`](../ui/README.md) package), it displays live system information (CPU, memory, processes, network interfaces, services) directly in the terminal.
 
+<p align="center">
+  <img src="../docs/images/admin-dashboard.svg" alt="admin-dashboard: the menu with a live detail panel, CPU and memory meters, the log view following" width="748">
+</p>
+
 > **Security Warning**
 >
-> This application exposes real system information -- hostname, running processes, network interfaces, memory usage, and service status -- to any client that connects over SSH. Authentication is disabled for demo purposes (`none` auth method is accepted). **Do not run this on a public network or production server without adding proper authentication and access controls.**
+> This application exposes real system information -- hostname, running processes, network interfaces, memory usage, and service status -- to any client that connects over SSH. Anyone can sign in for demo purposes: a client with a key must prove it holds the key, and one without a key gets in anonymously through keyboard-interactive (see [`@shellcraft/ui/auth`](../ui/README.md#ssh-authentication-shellcraftuiauth)). **Do not run this on a public network or production server without adding proper authentication and access controls.**
 
 ## Features
 

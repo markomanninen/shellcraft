@@ -2,6 +2,10 @@
 
 SSH-accessible terminal RPG with a deterministic simulation core and LLM narration layer.
 
+<p align="center">
+  <img src="../docs/images/adventure-game.svg" alt="adventure-game: start, the Game Master is thinking, a narrated turn, an action and a free-text question" width="748">
+</p>
+
 ## What Changed (Phase 1-3)
 
 - Phase 1:

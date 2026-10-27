@@ -15,7 +15,8 @@ shellcraft/
 ├── adventure-game/            # text RPG with an LLM
 ├── admin-dashboard/           # system monitoring dashboard
 ├── animation-demo/            # ASCII animations in the local terminal
-├── scripts/                   # maintenance scripts (CI failures, dependabot PRs)
+├── docs/images/               # README recordings of the apps (SVG)
+├── scripts/                   # README recorder, maintenance scripts (CI failures, dependabot PRs)
 ├── .github/                   # CI (tests, CodeQL, dependency scan), templates
 └── *.md                       # documentation
 ```

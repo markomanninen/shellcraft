@@ -44,12 +44,17 @@ network, add real authentication, rate limiting and access control.
 
 ## Demo Apps
 
-All four apps use Ink through `@shellcraft/ui`.
+All four apps use Ink through `@shellcraft/ui`. The recordings below are the
+real apps at 80×24, rendered frame by frame by `scripts/record-readme.mjs`.
 
 ### demo-shop: e-commerce
 
 A storefront: product table, cart, and a checkout form with validation. It is
 the reference app for the generator's `ecommerce` template.
+
+<p align="center">
+  <img src="docs/images/demo-shop.svg" alt="demo-shop: browse the products, add two to the cart, open the cart, check out; an incomplete email address is flagged under the field and in the status bar, then the order is placed" width="748">
+</p>
 
 ### adventure-game: text RPG with an LLM
 
@@ -58,18 +63,30 @@ A text adventure narrated by a Game Master LLM through [Ollama](https://ollama.c
 - deterministic game rules; the LLM only narrates (`OLLAMA_MODEL` picks the model)
 - sessions saved to `data/sessions.json`, so players can reconnect and continue
 - free-text input to the Game Master next to suggested actions
-- a loading animation while the LLM answers
+- a busy spinner in the status bar while the LLM answers
 - strict checks on the LLM's answers (invalid payloads fail fast)
+
+<p align="center">
+  <img src="docs/images/adventure-game.svg" alt="adventure-game: start an adventure, the Game Master is thinking (spinner in the status bar), the narrated room with status, actions and journal, then an action and a free-text question to the Game Master" width="748">
+</p>
 
 ### admin-dashboard: system monitoring
 
 A dashboard for the machine it runs on: overview, processes, resources, logs,
 network, services and settings, refreshed live.
 
+<p align="center">
+  <img src="docs/images/admin-dashboard.svg" alt="admin-dashboard: moving through the menu updates the detail panel, CPU and memory meters change live, the log view follows new lines" width="748">
+</p>
+
 ### animation-demo: terminal animations
 
 ASCII animations with speed control and pause. It runs in your local terminal
 (no SSH) through `renderLocal()`. Useful as a reference for loading screens.
+
+<p align="center">
+  <img src="docs/images/animation-demo.svg" alt="animation-demo: the crystal ball, bubbling cauldron, atom orbit and DNA helix animations, switched with the number keys" width="748">
+</p>
 
 ## Quick Start
 

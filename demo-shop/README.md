@@ -2,6 +2,10 @@
 
 A complete template for building SSH-based terminal applications with TUI (Text User Interface).
 
+<p align="center">
+  <img src="../docs/images/demo-shop.svg" alt="demo-shop: browse, add to cart, cart, checkout with an email error, order placed" width="748">
+</p>
+
 ## 🌟 Features
 
 - **SSH Server**: Built with ssh2 for secure remote access

@@ -5,6 +5,10 @@ and the shared [@shellcraft/ui](../ui/README.md) components. It shows a
 collection of ASCII art animations full screen in the local terminal -- no
 SSH server required.
 
+<p align="center">
+  <img src="../docs/images/animation-demo.svg" alt="animation-demo: several animations, switched with the number keys" width="748">
+</p>
+
 ```
  Animation Demo › Crystal Ball                                       speed 1.0×
 ╭─ Crystal Ball ───────────────────────────────────╮╭─ Animations ─────────────╮
