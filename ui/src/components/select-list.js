@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, Text, useInput } from 'ink';
-import { theme, glyphs } from '../theme.js';
+import { theme, glyphs, textProps } from '../theme.js';
 import { useSelection, stepIndex, windowStart } from '../selection.js';
 
 const h = React.createElement;
@@ -12,8 +12,8 @@ const h = React.createElement;
  * Disabled = muted.
  */
 export function ListItem({ label, hint, selected = false, disabled = false }) {
-  const textColor = selected ? theme.text.onAccent : disabled ? theme.text.muted : theme.text.default;
-  const hintColor = selected ? theme.text.onAccent : theme.text.muted;
+  const labelStyle = textProps(selected ? 'onAccent' : disabled ? 'muted' : 'default');
+  const hintStyle = textProps(selected ? 'onAccent' : 'muted');
   return h(
     Box,
     {
@@ -26,18 +26,18 @@ export function ListItem({ label, hint, selected = false, disabled = false }) {
     h(
       Box,
       { width: 2, flexShrink: 0 },
-      h(Text, { color: textColor, bold: selected }, selected ? glyphs.marker : ' ')
+      h(Text, { ...labelStyle, bold: selected }, selected ? glyphs.marker : ' ')
     ),
     h(
       Box,
       { flexGrow: 1, flexShrink: 1, overflow: 'hidden' },
-      h(Text, { color: textColor, bold: selected, wrap: 'truncate-end' }, label)
+      h(Text, { ...labelStyle, bold: selected, wrap: 'truncate-end' }, label)
     ),
     hint !== undefined && hint !== null && hint !== ''
       ? h(
           Box,
           { flexShrink: 0, marginLeft: 1 },
-          h(Text, { color: hintColor, bold: selected }, String(hint))
+          h(Text, { ...hintStyle, bold: selected }, String(hint))
         )
       : null
   );

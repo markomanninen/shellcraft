@@ -4,6 +4,10 @@ import React, { useState } from 'react';
 import { render, cleanup } from 'ink-testing-library';
 import {
   theme,
+  textProps,
+  borderProps,
+  borderTextProps,
+  DIM,
   KeyHint,
   Message,
   TitleBar,
@@ -21,26 +25,49 @@ import {
   Box,
   Text
 } from '../src/index.js';
-import { stripAnsi, styleAt, keys, tick } from '../src/testing.js';
+import { stripAnsi, styleAt, styleAtCell, boldDimText, keys, tick } from '../src/testing.js';
 
 const h = React.createElement;
 const plain = (r) => stripAnsi(r.lastFrame());
 const lines = (r) => plain(r).split('\n');
 const width = (line) => Array.from(line).length;
 
+/** Muted = the default foreground dimmed (SGR 2): no color, dim, not bold. */
+function assertMuted(style, what = 'text') {
+  assert.ok(style, `${what} is on screen`);
+  assert.equal(style.fg, undefined, `${what}: no color`);
+  assert.equal(style.dim, true, `${what}: dim`);
+  assert.equal(style.bold, false, `${what}: not bold + dim`);
+}
+
 afterEach(() => cleanup());
 
 describe('theme', () => {
-  it('uses ANSI color names only', () => {
-    const names = new Set(['black', 'red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'white', 'gray']);
+  it('uses ANSI color names, or dim, only', () => {
+    const names = new Set(['black', 'red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'white']);
     for (const group of Object.values(theme)) {
       for (const value of Object.values(group)) {
-        if (value !== undefined) assert.ok(names.has(value), `${value} is not an ANSI name`);
+        if (value !== undefined && value !== DIM) assert.ok(names.has(value), `${value} is not an ANSI name`);
       }
     }
     assert.equal(theme.text.default, undefined);
-    assert.equal(theme.text.muted, 'gray');
+    assert.equal(theme.text.muted, DIM);
+    assert.equal(theme.border.default, DIM);
     assert.equal(theme.surface.accent, 'cyan');
+  });
+
+  it('turns tokens into Ink props', () => {
+    assert.deepEqual(textProps('muted'), { dimColor: true });
+    assert.deepEqual(textProps('default'), {});
+    assert.deepEqual(textProps('accent'), { color: 'cyan' });
+    assert.deepEqual(textProps('danger'), { color: 'red' });
+    assert.deepEqual(textProps('onAccent'), { color: 'black' });
+    assert.deepEqual(borderProps('default'), { borderDimColor: true });
+    assert.deepEqual(borderProps('focus'), { borderColor: 'cyan' });
+    assert.deepEqual(borderProps('danger'), { borderColor: 'red' });
+    assert.deepEqual(borderTextProps('default'), { dimColor: true });
+    assert.deepEqual(borderTextProps('focus'), { color: 'cyan' });
+    assert.throws(() => textProps('grey'), /Unknown text token/);
   });
 });
 
@@ -48,9 +75,8 @@ describe('KeyHint', () => {
   it('renders key, one space, label', () => {
     const r = render(h(KeyHint, { k: 'q', label: 'quit' }));
     assert.equal(plain(r), 'q quit');
-    assert.deepEqual(styleAt(r.lastFrame(), 'q'), { fg: 'cyan', bg: undefined, bold: true, underline: false });
-    assert.equal(styleAt(r.lastFrame(), 'quit').fg, 'gray');
-    assert.equal(styleAt(r.lastFrame(), 'quit').bold, false);
+    assert.deepEqual(styleAt(r.lastFrame(), 'q'), { fg: 'cyan', bg: undefined, bold: true, dim: false, underline: false });
+    assertMuted(styleAt(r.lastFrame(), 'quit'), 'verb');
   });
 });
 
@@ -70,12 +96,12 @@ describe('Message', () => {
     });
   }
 
-  it('busy: braille spinner in cyan and muted text', async () => {
+  it('busy: braille spinner in cyan and muted (dim) text', async () => {
     const r = render(h(Message, { tone: 'busy' }, 'Thinking'));
     assert.match(plain(r), /^[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏] Thinking$/);
     const spinner = plain(r)[0];
     assert.equal(styleAt(r.lastFrame(), spinner).fg, 'cyan');
-    assert.equal(styleAt(r.lastFrame(), 'Thinking').fg, 'gray');
+    assertMuted(styleAt(r.lastFrame(), 'Thinking'));
     await tick(250);
     assert.ok(r.frames.length > 1, 'spinner animates');
   });
@@ -96,11 +122,11 @@ describe('TitleBar', () => {
     assert.ok(line.endsWith('cart: 1'));
     assert.equal(width(line), 59);
     const raw = r.lastFrame();
-    assert.deepEqual(styleAt(raw, 'Demo Shop'), { fg: 'cyan', bg: undefined, bold: true, underline: false });
-    assert.equal(styleAt(raw, '›').fg, 'gray');
+    assert.deepEqual(styleAt(raw, 'Demo Shop'), { fg: 'cyan', bg: undefined, bold: true, dim: false, underline: false });
+    assertMuted(styleAt(raw, '›'), 'separator');
     assert.equal(styleAt(raw, 'Products').fg, undefined);
     assert.equal(styleAt(raw, 'Products').bold, true);
-    assert.equal(styleAt(raw, 'cart: 1').fg, 'gray');
+    assertMuted(styleAt(raw, 'cart: 1'), 'meta');
   });
 });
 
@@ -151,11 +177,13 @@ describe('Panel', () => {
     for (const line of out) assert.equal(width(line), 30);
   });
 
-  it('is gray with a bold default title when not focused', () => {
+  it('has a dim border (top edge too) and a bold default title when not focused', () => {
     const raw = render(h(Panel, { title: 'Menu', width: 20, height: 4 })).lastFrame();
-    assert.equal(styleAt(raw, '╭').fg, 'gray');
-    assert.equal(styleAt(raw, '╰').fg, 'gray');
-    assert.deepEqual(styleAt(raw, 'Menu'), { fg: undefined, bg: undefined, bold: true, underline: false });
+    assertMuted(styleAt(raw, '╭─'), 'top edge');
+    assertMuted(styleAt(raw, '─╮'), 'top edge');
+    assertMuted(styleAt(raw, '│'), 'side');
+    assertMuted(styleAt(raw, '╰'), 'bottom');
+    assert.deepEqual(styleAt(raw, 'Menu'), { fg: undefined, bg: undefined, bold: true, dim: false, underline: false });
   });
 
   it('is cyan with a cyan title when focused', () => {
@@ -163,6 +191,7 @@ describe('Panel', () => {
     assert.equal(styleAt(raw, '╭').fg, 'cyan');
     assert.equal(styleAt(raw, '│').fg, 'cyan');
     assert.equal(styleAt(raw, '╯').fg, 'cyan');
+    assert.equal(styleAt(raw, '╯').dim, false);
     assert.equal(styleAt(raw, 'Menu').fg, 'cyan');
     assert.equal(styleAt(raw, 'Menu').bold, true);
   });
@@ -206,15 +235,17 @@ describe('SelectList / ListItem', () => {
 
   it('selected row: cyan background, black bold text, marker ›', () => {
     const raw = render(h(Box, { width: 30 }, h(SelectList, { items, selectedIndex: 1, isActive: false }))).lastFrame();
-    assert.deepEqual(styleAt(raw, 'View cart'), { fg: 'black', bg: 'cyan', bold: true, underline: false });
+    assert.deepEqual(styleAt(raw, 'View cart'), { fg: 'black', bg: 'cyan', bold: true, dim: false, underline: false });
     assert.equal(styleAt(raw, '›').bg, 'cyan');
     assert.equal(styleAt(raw, 'Browse').bg, undefined);
   });
 
-  it('disabled rows are gray', () => {
+  it('disabled rows and hints are muted', () => {
     const raw = render(h(Box, { width: 30 }, h(SelectList, { items, isActive: false }))).lastFrame();
-    assert.equal(styleAt(raw, 'Checkout').fg, 'gray');
+    assertMuted(styleAt(raw, 'Checkout'), 'disabled row');
+    assertMuted(styleAt(raw, '2'), 'hint');
     assert.equal(styleAt(raw, 'View cart').fg, undefined);
+    assert.equal(styleAt(raw, 'View cart').dim, false);
   });
 
   it('truncates long labels at the end', () => {
@@ -272,13 +303,14 @@ describe('Table', () => {
     ['prod_002', 'Espresso', '$9.99']
   ];
 
-  it('header bold gray underlined, no rule row, 1 space between columns', () => {
+  it('header muted and underlined, no rule row, 1 space between columns', () => {
     const r = render(h(Box, { width: 36 }, h(Table, { columns, rows, isActive: false })));
     const out = lines(r);
     assert.equal(out.length, 3, 'header + 2 rows, no rule row');
     assert.equal(out[0], ' ' + 'ID'.padEnd(10) + ' ' + 'Name'.padEnd(12) + ' ' + 'Price'.padStart(9));
     const raw = r.lastFrame();
-    assert.deepEqual(styleAt(raw, 'Name'), { fg: 'gray', bg: undefined, bold: true, underline: true });
+    // dim + underline; not bold + dim, which some terminals show as one of the two
+    assert.deepEqual(styleAt(raw, 'Name'), { fg: undefined, bg: undefined, bold: false, dim: true, underline: true });
     assert.ok(!/[─│┼]/.test(plain(r)), 'no column or row rules');
   });
 
@@ -294,7 +326,7 @@ describe('Table', () => {
 
   it('selected row as in SelectList', () => {
     const raw = render(h(Box, { width: 36 }, h(Table, { columns, rows, selectedIndex: 1, isActive: false }))).lastFrame();
-    assert.deepEqual(styleAt(raw, 'Espresso'), { fg: 'black', bg: 'cyan', bold: true, underline: false });
+    assert.deepEqual(styleAt(raw, 'Espresso'), { fg: 'black', bg: 'cyan', bold: true, dim: false, underline: false });
     assert.equal(styleAt(raw, 'Developer').bg, undefined);
   });
 
@@ -328,21 +360,26 @@ describe('TextField', () => {
     assert.equal(line.indexOf('marko'), 11);
     assert.equal(width(line.trimEnd()), 11 + 'marko@example.com'.length);
     const raw = r.lastFrame();
-    assert.deepEqual(styleAt(raw, 'Email'), { fg: 'gray', bg: undefined, bold: false, underline: false });
+    assertMuted(styleAt(raw, 'Email'), 'label');
+    // The rest of the 30 value cells: underlined spaces, dim like a border.
+    const rest = styleAtCell(raw, 0, 11 + 'marko@example.com'.length + 1);
+    assert.equal(rest.underline, true);
+    assert.equal(rest.dim, true);
+    assert.equal(styleAtCell(raw, 0, 40).underline, true, 'up to cell 41');
     assert.equal(styleAt(raw, 'marko').underline, true);
     assert.equal(styleAt(raw, 'marko').fg, undefined);
   });
 
   it('placeholder in muted', () => {
     const raw = render(h(TextField, { label: 'Name', placeholder: 'Your name' })).lastFrame();
-    assert.equal(styleAt(raw, 'Your name').fg, 'gray');
+    assertMuted(styleAt(raw, 'Your name'), 'placeholder');
   });
 
   it('focused: bold cyan label and a cyan cursor', () => {
     const r = render(h(TextField, { label: 'Address', value: 'Main Street 1', focused: true }));
     assert.ok(lines(r)[0].startsWith('Address    Main Street 1█'));
     const raw = r.lastFrame();
-    assert.deepEqual(styleAt(raw, 'Address'), { fg: 'cyan', bg: undefined, bold: true, underline: false });
+    assert.deepEqual(styleAt(raw, 'Address'), { fg: 'cyan', bg: undefined, bold: true, dim: false, underline: false });
     assert.equal(styleAt(raw, '█').fg, 'cyan');
   });
 
@@ -358,7 +395,7 @@ describe('TextField', () => {
     assert.equal(out.length, 2);
     assert.equal(out[1], `${' '.repeat(11)}✗ Enter a full address`);
     const raw = r.lastFrame();
-    assert.deepEqual(styleAt(raw, 'Email'), { fg: 'red', bg: undefined, bold: true, underline: false });
+    assert.deepEqual(styleAt(raw, 'Email'), { fg: 'red', bg: undefined, bold: true, dim: false, underline: false });
     assert.equal(styleAt(raw, '✗').fg, 'red');
   });
 
@@ -397,17 +434,18 @@ describe('TextField', () => {
 });
 
 describe('Button', () => {
-  it('brackets gray, label bold', () => {
+  it('brackets muted, label bold', () => {
     const r = render(h(Button, { label: 'Submit order' }));
     assert.equal(plain(r), '[ Submit order ]');
-    assert.equal(styleAt(r.lastFrame(), '[').fg, 'gray');
+    assertMuted(styleAt(r.lastFrame(), '['), 'bracket');
+    assert.equal(styleAt(r.lastFrame(), 'Submit').bold, true);
     assert.equal(styleAt(r.lastFrame(), 'Submit').bg, undefined);
   });
 
   it('focused: cyan background, black bold', () => {
     const raw = render(h(Button, { label: 'Submit order', focused: true })).lastFrame();
-    assert.deepEqual(styleAt(raw, '['), { fg: 'black', bg: 'cyan', bold: true, underline: false });
-    assert.deepEqual(styleAt(raw, 'Submit'), { fg: 'black', bg: 'cyan', bold: true, underline: false });
+    assert.deepEqual(styleAt(raw, '['), { fg: 'black', bg: 'cyan', bold: true, dim: false, underline: false });
+    assert.deepEqual(styleAt(raw, 'Submit'), { fg: 'black', bg: 'cyan', bold: true, dim: false, underline: false });
   });
 });
 
@@ -417,10 +455,9 @@ describe('Meter', () => {
     assert.equal(plain(r), 'CPU     ████████░░░░░░░░░░░░     41%');
     assert.equal(width(plain(r)), METER_WIDTH);
     const raw = r.lastFrame();
-    assert.equal(styleAt(raw, 'CPU').fg, 'gray');
-    assert.equal(styleAt(raw, 'CPU').bold, true);
+    assertMuted(styleAt(raw, 'CPU'), 'label');
     assert.equal(styleAt(raw, '█').fg, 'cyan');
-    assert.equal(styleAt(raw, '░').fg, 'gray');
+    assertMuted(styleAt(raw, '░'), 'empty bar');
   });
 
   it('tones color the bar', () => {
@@ -466,7 +503,7 @@ describe('EmptyState', () => {
     assert.equal(out[messageRow + 1].trim(), 'Browse with b back');
     const raw = r.lastFrame();
     assert.equal(styleAt(raw, 'Your cart').fg, undefined);
-    assert.equal(styleAt(raw, 'Browse').fg, 'gray');
+    assertMuted(styleAt(raw, 'Browse'), 'hint');
     assert.equal(styleAt(raw, 'b back').fg, 'cyan');
     assert.ok(!raw.includes('\u001B[31m'), 'no red');
     assert.ok(!/[╭│]/.test(plain(r)), 'no box');

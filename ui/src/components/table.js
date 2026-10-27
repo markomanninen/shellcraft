@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, Text, useInput } from 'ink';
-import { theme } from '../theme.js';
+import { theme, textProps } from '../theme.js';
 import { useSelection, windowStart } from '../selection.js';
 
 const h = React.createElement;
@@ -10,13 +10,16 @@ const h = React.createElement;
  * between them, no rules. Cells truncate at their width; align 'right'
  * for numbers. A column with grow: true takes the spare width.
  *
- * variant: 'header' (bold muted underlined) | 'default' | 'selected'
+ * variant: 'header' (muted, underlined) | 'default' | 'selected'
  * bold: bold cells (e.g. a total row).
+ *
+ * The header is dim + underline, not bold: bold and dim together show as
+ * only one of them on terminals with a single intensity attribute.
  */
 export function TableRow({ columns, cells = [], variant = 'default', bold = false }) {
   const selected = variant === 'selected';
   const header = variant === 'header';
-  const color = selected ? theme.text.onAccent : header ? theme.text.muted : theme.text.default;
+  const cellStyle = textProps(selected ? 'onAccent' : header ? 'muted' : 'default');
   return h(
     Box,
     {
@@ -28,7 +31,7 @@ export function TableRow({ columns, cells = [], variant = 'default', bold = fals
     },
     ...columns.map((column, i) => {
       const value = cells[i];
-      const text = value === undefined || value === null ? '' : String(value);
+      const label = value === undefined || value === null ? '' : String(value);
       return h(
         Box,
         {
@@ -43,12 +46,12 @@ export function TableRow({ columns, cells = [], variant = 'default', bold = fals
         h(
           Text,
           {
-            color,
-            bold: bold || selected || header,
-            underline: header && text !== '',
+            ...cellStyle,
+            bold: !header && (bold || selected),
+            underline: header && label !== '',
             wrap: 'truncate-end'
           },
-          text
+          label
         )
       );
     })

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, Text } from 'ink';
-import { theme, glyphs } from '../theme.js';
+import { glyphs, textProps } from '../theme.js';
 import { KeyHint } from './key-hint.js';
 import { toMessageElement } from './message.js';
 import { SizeProvider, useScreenSize, useTerminalSize } from '../size.js';
@@ -21,13 +21,13 @@ export function TitleBar({ app, screen, meta }) {
       h(
         Text,
         { wrap: 'truncate-end' },
-        h(Text, { bold: true, color: theme.text.accent }, app),
-        screen ? h(Text, { color: theme.text.muted }, ` ${glyphs.separator} `) : null,
-        screen ? h(Text, { bold: true, color: theme.text.default }, screen) : null
+        h(Text, { bold: true, ...textProps('accent') }, app),
+        screen ? h(Text, textProps('muted'), ` ${glyphs.separator} `) : null,
+        screen ? h(Text, { bold: true, ...textProps('default') }, screen) : null
       )
     ),
     meta
-      ? h(Box, { flexShrink: 0, marginLeft: 2 }, h(Text, { color: theme.text.muted }, meta))
+      ? h(Box, { flexShrink: 0, marginLeft: 2 }, h(Text, textProps('muted'), meta))
       : null
   );
 }

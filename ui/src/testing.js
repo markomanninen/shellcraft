@@ -31,15 +31,54 @@ const FG = {
   95: 'magentaBright', 96: 'cyanBright', 97: 'whiteBright'
 };
 
+const PLAIN = Object.freeze({ fg: undefined, bg: undefined, bold: false, dim: false, underline: false });
+
 /**
  * Style of the first character of `needle` in a raw (ANSI) frame:
- * { fg, bg, bold, underline } with ANSI color names, undefined = default.
- * Returns null when the text is not on screen. `occurrence` picks the n-th
- * match (0-based).
+ * { fg, bg, bold, dim, underline } with ANSI color names, undefined =
+ * default. Returns null when the text is not on screen. `occurrence` picks
+ * the n-th match (0-based).
  */
 export function styleAt(raw, needle, occurrence = 0) {
+  const chars = styledChars(raw);
+  const target = Array.from(needle);
+  let seen = 0;
+  for (let i = 0; i + target.length <= chars.length; i++) {
+    if (target.every((ch, j) => chars[i + j].ch === ch)) {
+      if (seen === occurrence) return { ...chars[i].style };
+      seen++;
+    }
+  }
+  return null;
+}
+
+/** Style of the cell at (row, column) of a raw frame (0-based), or null. */
+export function styleAtCell(raw, row, column) {
+  let r = 0;
+  let c = 0;
+  for (const { ch, style } of styledChars(raw)) {
+    if (ch === '\n') {
+      r++;
+      c = 0;
+      continue;
+    }
+    if (r === row && c === column) return { ...style };
+    c++;
+  }
+  return null;
+}
+
+/** Characters of a raw frame that are both bold and dim (see theme.js). */
+export function boldDimText(raw) {
+  return styledChars(raw)
+    .filter(({ ch, style }) => style.bold && style.dim && ch.trim() !== '')
+    .map(({ ch }) => ch)
+    .join('');
+}
+
+function styledChars(raw) {
   const chars = [];
-  let style = { fg: undefined, bg: undefined, bold: false, underline: false };
+  let style = { ...PLAIN };
   // eslint-disable-next-line no-control-regex
   const token = /\u001B\[([0-9;]*)m|\u001B(?:\[[0-?]*[ -/]*[@-~]|\][^\u0007\u001B]*(?:\u0007|\u001B\\)|[@-Z\\-_])|([\s\S])/gu;
   for (const match of String(raw).matchAll(token)) {
@@ -47,9 +86,11 @@ export function styleAt(raw, needle, occurrence = 0) {
       const codes = match[1] === '' ? [0] : match[1].split(';').map(Number);
       style = { ...style };
       for (const code of codes) {
-        if (code === 0) style = { fg: undefined, bg: undefined, bold: false, underline: false };
+        if (code === 0) style = { ...PLAIN };
         else if (code === 1) style.bold = true;
-        else if (code === 22) style.bold = false;
+        else if (code === 2) style.dim = true;
+        // One reset for both: SGR 1 and 2 are one "intensity" in ECMA-48.
+        else if (code === 22) Object.assign(style, { bold: false, dim: false });
         else if (code === 4) style.underline = true;
         else if (code === 24) style.underline = false;
         else if (code === 39) style.fg = undefined;
@@ -61,15 +102,7 @@ export function styleAt(raw, needle, occurrence = 0) {
       chars.push({ ch: match[2], style });
     }
   }
-  const target = Array.from(needle);
-  let seen = 0;
-  for (let i = 0; i + target.length <= chars.length; i++) {
-    if (target.every((ch, j) => chars[i + j].ch === ch)) {
-      if (seen === occurrence) return { ...chars[i].style };
-      seen++;
-    }
-  }
-  return null;
+  return chars;
 }
 
 export const tick = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -115,6 +148,24 @@ class FakeStdin extends EventEmitter {
   }
 }
 
+const mounted = new Set();
+
+/**
+ * Unmount everything renderTerminal() mounted and is still mounted. Call it
+ * from afterEach, so a failing test cannot leave an animated tree (spinner)
+ * keeping the test process alive.
+ */
+export function cleanupTerminals() {
+  for (const instance of mounted) {
+    try {
+      instance.unmount();
+    } catch {
+      // Already gone.
+    }
+  }
+  mounted.clear();
+}
+
 /**
  * Render on a columns x rows fake terminal. Frames are whole screens (Ink
  * debug mode), so lastFrame() is what the user would see.
@@ -132,6 +183,8 @@ export function renderTerminal(element, { columns = 80, rows = 24 } = {}) {
     exitOnCtrlC: false,
     patchConsole: false
   });
+  // Unmounting twice is a no-op in Ink, so finished instances can stay listed.
+  mounted.add(instance);
 
   const lastFrame = () => stdout.frames.at(-1) ?? '';
 

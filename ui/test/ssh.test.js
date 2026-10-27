@@ -4,7 +4,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import React, { useState } from 'react';
 import xterm from '@xterm/headless';
-import { serve, toCrlf, Screen, Panel, SelectList, useApp, useInput } from '../src/index.js';
+import { serve, toCrlf, Screen, Panel, SelectList, Text, useApp, useInput } from '../src/index.js';
 import { tick, keys } from '../src/testing.js';
 import { FakeSshChannel as FakeChannel, FakeSshSession as FakeSession } from '../src/testing.js';
 
@@ -99,7 +99,8 @@ describe('serve() over a fake SSH channel', () => {
     await tick(60);
     const raw = channel.output.join('');
     assert.ok(raw.includes('\u001B[36m'), 'cyan');
-    assert.ok(raw.includes('\u001B[90m'), 'gray');
+    assert.ok(raw.includes('\u001B[2m'), 'dim (muted text, default borders)');
+    assert.ok(!raw.includes('\u001B[90m'), 'no bright black');
     assert.ok(raw.includes('\u001B[46m'), 'cyan background on the selected row');
     assert.ok(!/\u001B\[(?:3|4)8;/.test(raw), 'no 256/truecolor codes');
     cleanup();
@@ -235,6 +236,25 @@ describe('serve() over a fake SSH channel', () => {
   });
 });
 
+describe('bold + dim', () => {
+  it('Ink sends SGR 1, then 2, then one 22 for both; xterm.js keeps both flags', async () => {
+    // Why the theme never combines muted (dim) with bold: SGR 1 and 2 share
+    // the reset 22, and terminals with one "intensity" attribute (ECMA-48,
+    // the Linux console) show only the one set last, here dim.
+    const term = new Terminal({ cols: 20, rows: 3, allowProposedApi: true });
+    const channel = new FakeChannel((text, callback) => term.write(text, callback));
+    const cleanup = serve(channel, { cols: 20, rows: 3 }, h(Text, { bold: true, dimColor: true }, 'BD'));
+    await tick(60);
+    const raw = channel.output.join('');
+    assert.match(raw, /\u001B\[1m\u001B\[2mBD\u001B\[22m/);
+    const cell = term.buffer.active.getLine(0).getCell(0);
+    assert.equal(Boolean(cell.isBold()), true);
+    assert.equal(Boolean(cell.isDim()), true);
+    cleanup();
+    await cleanup.exited;
+  });
+});
+
 describe('colors without a TTY', () => {
   it('a server process with no TTY and no FORCE_COLOR still sends colors', () => {
     const env = { ...process.env };
@@ -249,7 +269,7 @@ describe('colors without a TTY', () => {
     assert.equal(report.forceColor, null, 'and no FORCE_COLOR');
     assert.equal(report.level, 1, 'chalk pinned to the 16 basic colors');
     assert.equal(report.cyan, true, 'output has \\e[36m');
-    assert.equal(report.gray, true, 'output has \\e[90m');
+    assert.equal(report.dim, true, 'output has \\e[2m');
   });
 
   it('imports ink first and is still colored', () => {
@@ -271,5 +291,6 @@ describe('colors without a TTY', () => {
     const report = JSON.parse(result.stdout.trim().split('\n').at(-1));
     assert.equal(report.level, 0);
     assert.equal(report.cyan, false);
+    assert.equal(report.dim, false);
   });
 });

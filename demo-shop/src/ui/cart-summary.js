@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Text, theme } from '@shellcraft/ui';
+import { Box, Text, textProps } from '@shellcraft/ui';
 
 const h = React.createElement;
 
@@ -26,6 +26,9 @@ export const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
 const LABEL_WIDTH = 24;
 
+// Product lines: muted name, default value. The total: both bold, and the
+// label not muted, because bold + dim shows as only one of them on some
+// terminals.
 function Row({ label, value, bold = false }) {
   return h(
     Box,
@@ -33,9 +36,9 @@ function Row({ label, value, bold = false }) {
     h(
       Box,
       { width: LABEL_WIDTH, flexShrink: 0, overflow: 'hidden' },
-      h(Text, { color: theme.text.muted, bold, wrap: 'truncate-end' }, label)
+      h(Text, { ...textProps(bold ? 'default' : 'muted'), bold, wrap: 'truncate-end' }, label)
     ),
-    h(Text, { color: theme.text.default, bold, wrap: 'truncate-end' }, value)
+    h(Text, { ...textProps('default'), bold, wrap: 'truncate-end' }, value)
   );
 }
 

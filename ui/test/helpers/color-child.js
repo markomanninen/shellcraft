@@ -26,6 +26,6 @@ console.log(JSON.stringify({
   forceColor: process.env.FORCE_COLOR ?? null,
   level: colorLevel(),
   cyan: raw.includes('\u001B[36m'),
-  gray: raw.includes('\u001B[90m')
+  dim: raw.includes('\u001B[2m')
 }));
 process.exit(0);

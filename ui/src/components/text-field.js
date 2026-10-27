@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
 import { Box, Text, useInput } from 'ink';
-import { theme, glyphs } from '../theme.js';
+import { glyphs, textProps, borderTextProps } from '../theme.js';
 
 const h = React.createElement;
 
@@ -11,8 +11,8 @@ const CONTROL = /[\u0000-\u001f\u007f-\u009f]/g;
 const chars = (s) => Array.from(s ?? '');
 
 /**
- * Label column (11 cells) + value (30 cells, underlined). Focus turns the
- * label and underline accent; while editing the field shows the cursor `█`
+ * Label column (11 cells, muted) + value (30 cells, underlined). Focus turns
+ * the label and underline accent; while editing the field shows the cursor `█`
  * and takes keys. An error turns label and underline red and adds one line
  * under the value: `✗ message`, indented to the value column.
  *
@@ -72,17 +72,20 @@ export function TextField({
 
   const hasError = Boolean(error);
   const showCursor = Boolean(focused && editing);
-  const labelColor = hasError ? theme.text.danger : focused ? theme.text.accent : theme.text.muted;
-  const lineColor = hasError ? theme.border.danger : focused ? theme.border.focus : theme.border.default;
+  const state = hasError ? 'danger' : focused ? 'focus' : 'default';
+  // Label: bold red / bold cyan, or muted (dim, never bold + dim).
+  const labelProps = { ...textProps(hasError ? 'danger' : focused ? 'accent' : 'muted'), bold: hasError || focused };
+  // The rest of the underline takes the border color of the state.
+  const lineProps = borderTextProps(state);
 
   // Value cells: text, optional cursor, then underlined spaces up to the width.
   const room = Math.max(valueWidth - (showCursor ? 1 : 0), 0);
   const valueChars = chars(value);
   let shown;
-  let shownColor = theme.text.default;
+  let shownProps = textProps('default');
   if (valueChars.length === 0) {
     shown = showCursor ? '' : chars(placeholder).slice(0, room).join('');
-    shownColor = theme.text.muted;
+    shownProps = textProps('muted');
   } else if (valueChars.length <= room) {
     shown = value;
   } else if (showCursor) {
@@ -102,7 +105,7 @@ export function TextField({
       h(
         Box,
         { width: labelWidth, flexShrink: 0, overflow: 'hidden' },
-        h(Text, { color: labelColor, bold: focused || hasError, wrap: 'truncate-end' }, label)
+        h(Text, { ...labelProps, wrap: 'truncate-end' }, label)
       ),
       h(
         Box,
@@ -110,9 +113,9 @@ export function TextField({
         h(
           Text,
           { wrap: 'truncate-end' },
-          shown ? h(Text, { color: shownColor, underline: true }, shown) : null,
-          showCursor ? h(Text, { color: theme.text.accent }, glyphs.cursor) : null,
-          fill > 0 ? h(Text, { color: lineColor, underline: true }, ' '.repeat(fill)) : null
+          shown ? h(Text, { ...shownProps, underline: true }, shown) : null,
+          showCursor ? h(Text, textProps('accent'), glyphs.cursor) : null,
+          fill > 0 ? h(Text, { ...lineProps, underline: true }, ' '.repeat(fill)) : null
         )
       )
     ),
@@ -120,7 +123,7 @@ export function TextField({
       ? h(
           Box,
           { height: 1, paddingLeft: labelWidth },
-          h(Text, { color: theme.text.danger, wrap: 'truncate-end' }, `${glyphs.error} ${error}`)
+          h(Text, { ...textProps('danger'), wrap: 'truncate-end' }, `${glyphs.error} ${error}`)
         )
       : null
   );

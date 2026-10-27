@@ -42,19 +42,43 @@ const h = React.createElement;
 
 ## Theme
 
-`theme.js` is the only place colors are named; values are ANSI color names,
-so the user's terminal theme decides the RGB. The screen background is never
-painted.
+`theme.js` is the only place colors are named; colors are ANSI color names,
+so the user's terminal theme decides the RGB. Muted text and default borders
+are not a color: they are the terminal's default foreground with SGR 2
+("faint"), which terminals draw blended toward the background (roughly 50%;
+xterm.js uses half opacity). Faint follows the user's theme and can never be
+the background color, which ANSI 8 can (see the contrast table below). The
+screen background is never painted.
 
 | Token | Value | Use |
 |---|---|---|
 | `text.default` | terminal default | body text |
-| `text.muted` | `gray` (ANSI 8, bright black) | hints, labels, placeholders, empty states |
+| `text.muted` | default, dim (SGR 2) | hints, labels, placeholders, empty states |
 | `text.accent` | `cyan` | app name, focus, keys |
 | `text.success` / `warning` / `danger` | `green` / `yellow` / `red` | messages; red only for errors |
 | `text.onAccent` | `black` | text on the accent fill |
 | `surface.accent` | `cyan` | selected row, focused button |
-| `border.default` / `focus` / `danger` | `gray` / `cyan` / `red` | panel borders; one focused panel at a time |
+| `border.default` / `focus` / `danger` | default, dim / `cyan` / `red` | panel borders; one focused panel at a time |
+
+Components never spell out color props; they ask the theme:
+
+```js
+textProps('muted')          // { dimColor: true }
+textProps('accent')         // { color: 'cyan' }
+textProps('default')        // {}
+borderProps('default')      // { borderDimColor: true }  for <Box borderStyle>
+borderProps('focus')        // { borderColor: 'cyan' }
+borderTextProps('default')  // { dimColor: true }        for borders drawn as text
+```
+
+**Bold and dim are never combined.** Ink (chalk) sends SGR `1`, then `2`,
+and one `22` that resets both. xterm.js keeps bold and faint as separate
+flags (checked with @xterm/headless), but ECMA-48 defines them as one
+"intensity" attribute and terminals that follow it (the Linux console, for
+one) show only the one set last. So the muted table header is dim +
+underline and the meter label is dim, not bold; a bold label (the cart
+total) is default-colored. `boldDimText()` in the testing helpers checks
+frames for it.
 
 ## Components
 
@@ -66,11 +90,11 @@ works at 100×30 and wider.
 | `Screen` | `app, screen, meta, hints, message, width?, height?` | Full terminal (size from the stream, updated on resize). Row 0 TitleBar, last row StatusBar, body fills the rest. |
 | `TitleBar` | `app, screen, meta` | `App › Screen` left, meta right, 1 cell padding. |
 | `StatusBar` | `hints: [[key, label]], message` | Hints two spaces apart, the latest message right-aligned. `message`: `'text'`, `{ tone, text }` or an element. |
-| `KeyHint` | `k, label` | `q quit`: key bold cyan, verb gray. |
+| `KeyHint` | `k, label` | `q quit`: key bold cyan, verb muted. |
 | `Message` | `tone: info\|success\|warning\|error\|busy`, children | `i` / `✓` / `!` / `✗` / spinner + text, one line. |
 | `Panel` | `title, focused, width?, height?, padding = 1` | Round border with the title in the top edge: `╭─ Title ───╮`. Lists and tables use `padding={0}`. |
 | `SelectList` / `ListItem` | `items: [{label, hint, disabled}], selectedIndex, onChange, onSelect, isActive, height?` | ↑↓ (k/j) move, ⏎ select, 1-9 jump. Selected row: cyan fill, black bold, `›`. |
-| `Table` / `TableRow` | `columns: [{label, width, align, grow}], rows, selectedIndex, onChange, onSelect, isActive, height?` | Header bold gray underlined, no rules, cells truncate, 1 space between columns. `selectedIndex={-1}`: no selection bar. |
+| `Table` / `TableRow` | `columns: [{label, width, align, grow}], rows, selectedIndex, onChange, onSelect, isActive, height?` | Header muted and underlined, no rules, cells truncate, 1 space between columns. `selectedIndex={-1}`: no selection bar. |
 | `TextField` | `label, value, focused, editing = focused, error, placeholder, onChange, onSubmit, onCancel` | Label 11 cells, value 30 cells underlined; editing shows `█` and takes keys; error adds `✗ message` under the value. |
 | `Button` | `label, focused` | `[ label ]`; focused = cyan fill. Form actions only. |
 | `Meter` | `label, value, max = 100, display?, tone` | 36 cells: label 8, bar 20, value 8 right-aligned. |
@@ -153,11 +177,12 @@ output into a headless xterm):
 
 `npm test` runs `node --test test/*.test.js`.
 
-## Muted text contrast
+## Why muted is dim, not gray
 
-The theme uses ANSI 8 (bright black, chalk `gray`) for muted text. Its
-contrast against the background, computed from each theme's published
-palette with the WCAG 2.1 formula (`node scripts/contrast.mjs`):
+The first version used ANSI 8 (bright black, chalk `gray`) for muted text
+and default borders. Its contrast against the background, computed from each
+theme's published palette with the WCAG 2.1 formula
+(`node scripts/contrast.mjs`):
 
 | Terminal theme | Background | Bright black | Contrast | WCAG 2.1 |
 |---|---|---|---|---|
@@ -199,12 +224,14 @@ Sources:
   system style the background comes from the GTK theme; the dark row assumes
   `#1e1e1e` (palette entry 0).
 
-What this means: gray is fine on light themes and close to AA on Windows
-Terminal, but on most dark themes it only meets the 3:1 "large text / UI"
-level, and on Solarized Dark it is the background color, so muted text
-disappears. Muted is used for key-hint verbs, title-bar meta, placeholders,
-disabled rows, empty-state hints, meter labels and table headers (bold),
-and for unfocused text-field labels. The keys themselves, values and
-selected rows never depend on gray. Solarized Dark users lose the muted
-text entirely; that is an open issue (options: `dimColor` on the default
-color instead of ANSI 8, or a per-session "high contrast" theme).
+Gray was fine on light themes and close to AA on Windows Terminal, but on
+most dark themes it only met the 3:1 "large text / UI" level, and on
+Solarized Dark it is the background color, so muted text disappeared. Hence
+dim: it is derived from the theme's own foreground, so it always stays
+between the text and the background. On Solarized Dark the foreground base0
+`#839496` at about half strength over base03 is roughly `#426066`, about
+2.2:1: low, but visible where gray was invisible. Muted is used for key-hint
+verbs, title-bar meta, placeholders, disabled rows, empty-state hints, meter
+labels, table headers and unfocused text-field labels; keys, values and
+selected rows never depend on it. Terminals without SGR 2 support show muted
+text at full strength, which costs hierarchy, not legibility.

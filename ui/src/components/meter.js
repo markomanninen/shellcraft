@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, Text } from 'ink';
-import { theme, glyphs, meterTones } from '../theme.js';
+import { glyphs, meterTones, textProps } from '../theme.js';
 
 const h = React.createElement;
 
@@ -17,8 +17,9 @@ export function meterCells(value, max = 100) {
 }
 
 /**
- * 36 cells: label 8 (bold muted), bar 20 (`█` in the tone color, the rest
- * `░` muted), value 8 right-aligned in its own column, so it never wraps.
+ * 36 cells: label 8 (muted), bar 20 (`█` in the tone color, the rest `░`
+ * muted), value 8 right-aligned in its own column, so it never wraps.
+ * The label is dim, not bold + dim (see theme.js).
  * tone: default (accent) | warning | danger.
  */
 export function Meter({ label, value = 0, max = 100, display, tone = 'default' }) {
@@ -30,7 +31,7 @@ export function Meter({ label, value = 0, max = 100, display, tone = 'default' }
     h(
       Box,
       { width: LABEL_WIDTH, flexShrink: 0, overflow: 'hidden' },
-      h(Text, { bold: true, color: theme.text.muted, wrap: 'truncate-end' }, label)
+      h(Text, { ...textProps('muted'), wrap: 'truncate-end' }, label)
     ),
     h(
       Box,
@@ -38,8 +39,8 @@ export function Meter({ label, value = 0, max = 100, display, tone = 'default' }
       h(
         Text,
         null,
-        filled > 0 ? h(Text, { color: meterTones[tone] ?? meterTones.default }, glyphs.barFull.repeat(filled)) : null,
-        filled < BAR_WIDTH ? h(Text, { color: theme.text.muted }, glyphs.barEmpty.repeat(BAR_WIDTH - filled)) : null
+        filled > 0 ? h(Text, textProps(meterTones[tone] ?? meterTones.default), glyphs.barFull.repeat(filled)) : null,
+        filled < BAR_WIDTH ? h(Text, textProps('muted'), glyphs.barEmpty.repeat(BAR_WIDTH - filled)) : null
       )
     ),
     h(

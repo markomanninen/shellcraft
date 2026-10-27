@@ -1,7 +1,7 @@
 // Pins Ink's chalk to the 16 ANSI colors, whatever the server's TTY says.
 import './color.js';
 
-export { theme, glyphs, tones, meterTones } from './theme.js';
+export { theme, glyphs, tones, meterTones, textProps, borderProps, borderTextProps, DIM } from './theme.js';
 export { useTerminalSize, useScreenSize } from './size.js';
 export { Screen, TitleBar, StatusBar } from './components/screen.js';
 export { KeyHint } from './components/key-hint.js';

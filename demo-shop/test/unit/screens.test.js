@@ -1,13 +1,15 @@
-import { describe, it } from 'node:test';
+import { describe, it, afterEach } from 'node:test';
 import { strict as assert } from 'assert';
 import React from 'react';
-import { renderTerminal, styleAt, tick } from '@shellcraft/ui/testing';
+import { renderTerminal, cleanupTerminals, styleAt, boldDimText, tick } from '@shellcraft/ui/testing';
 import { ShopApp } from '../../src/ui/app.js';
 import { SessionManager } from '../../src/server/session.js';
 import { ProductModel } from '../../src/models/product.js';
 import { validateField, validateForm } from '../../src/ui/checkout.js';
 
 const h = React.createElement;
+
+afterEach(() => cleanupTerminals());
 
 function open({ columns = 80, rows = 24, session = new SessionManager().createSession(null) } = {}) {
   const t = renderTerminal(h(ShopApp, { session }), { columns, rows });
@@ -26,6 +28,7 @@ function assertScreen(t, columns, rows, screen) {
   assert.ok(lines[0].startsWith(` Demo Shop › ${screen}`), `row 0: "${lines[0]}"`);
   assert.ok(lines[1].startsWith('╭─ '), `row 1: "${lines[1]}"`);
   assert.ok(lines[rows - 2].startsWith('╰'), `row ${rows - 2}: "${lines[rows - 2]}"`);
+  assert.equal(boldDimText(t.lastFrame()), '', `${screen}: nothing is bold and dim at once`);
   return lines;
 }
 
@@ -51,8 +54,9 @@ describe('Shop screens (80x24)', () => {
     assert.equal(styleAt(raw, 'Menu').fg, 'cyan', 'menu panel has focus');
     assert.equal(styleAt(raw, 'Cart').fg, undefined, 'detail panel title default color');
     assert.equal(styleAt(raw, '╭').fg, 'cyan');
-    assert.equal(styleAt(raw, '╭', 1).fg, 'gray', 'only one focused panel');
-    assert.deepEqual(styleAt(raw, 'Browse products'), { fg: 'black', bg: 'cyan', bold: true, underline: false });
+    assert.equal(styleAt(raw, '╭', 1).fg, undefined, 'only one focused panel');
+    assert.equal(styleAt(raw, '╭', 1).dim, true, 'the other border is dim');
+    assert.deepEqual(styleAt(raw, 'Browse products'), { fg: 'black', bg: 'cyan', bold: true, dim: false, underline: false });
     t.unmount();
   });
 
@@ -68,7 +72,7 @@ describe('Shop screens (80x24)', () => {
     assert.ok(lines[3].startsWith('│ prod_001   Developer Blend          Dark roast for late nights'));
     assert.ok(lines[3].endsWith('$24.99 │'));
     assert.equal(statusRow(t), ' ↑↓ move  a add to cart  c cart  b back');
-    assert.deepEqual(styleAt(t.lastFrame(), 'prod_001'), { fg: 'black', bg: 'cyan', bold: true, underline: false });
+    assert.deepEqual(styleAt(t.lastFrame(), 'prod_001'), { fg: 'black', bg: 'cyan', bold: true, dim: false, underline: false });
 
     // Add two products; the result is a status bar message, not a box.
     await t.press('a');
@@ -95,6 +99,7 @@ describe('Shop screens (80x24)', () => {
     assert.equal(statusRow(t), ' ↑↓ move  c checkout  x clear cart  b back');
 
     // Checkout
+    let raw0;
     await t.press('c');
     lines = assertScreen(t, 80, 24, 'Checkout');
     assert.ok(lines[1].startsWith('╭─ Shipping ─'));
@@ -105,6 +110,10 @@ describe('Shop screens (80x24)', () => {
     assert.ok(t.text().includes('Developer Blend         1 × $24.99'));
     assert.ok(t.text().includes('Total                   $44.98'));
     assert.ok(t.text().includes('[ Place order ]'));
+    raw0 = t.lastFrame();
+    assert.equal(styleAt(raw0, 'Developer Blend').dim, true, 'order lines: muted name');
+    assert.deepEqual(styleAt(raw0, 'Total'), { fg: undefined, bg: undefined, bold: true, dim: false, underline: false });
+    assert.equal(styleAt(raw0, 'Your name').dim, true, 'placeholder is muted');
     assert.equal(statusRow(t), ' ↑↓ field  ⏎ edit  b back');
     assert.equal(styleAt(t.lastFrame(), 'Name').fg, 'cyan', 'first field focused');
 
@@ -131,7 +140,7 @@ describe('Shop screens (80x24)', () => {
     await t.press('down');
     assert.equal(statusRow(t), ' ↑↓ field  ⏎ place order  b back');
     let raw = t.lastFrame();
-    assert.deepEqual(styleAt(raw, '[ Place order ]'), { fg: 'black', bg: 'cyan', bold: true, underline: false });
+    assert.deepEqual(styleAt(raw, '[ Place order ]'), { fg: 'black', bg: 'cyan', bold: true, dim: false, underline: false });
     assert.equal(styleAt(raw, 'Order').fg, 'cyan', 'Order panel focused with its button');
     assert.equal(styleAt(raw, 'Shipping').fg, undefined);
 
@@ -141,7 +150,7 @@ describe('Shop screens (80x24)', () => {
     assert.equal(lines[6], `│            ✗ Enter a full address${' '.repeat(44)}│`);
     assert.ok(statusRow(t).endsWith('✗ Fix 1 field before ordering'), statusRow(t));
     raw = t.lastFrame();
-    assert.deepEqual(styleAt(raw, 'Email'), { fg: 'red', bg: undefined, bold: true, underline: false });
+    assert.deepEqual(styleAt(raw, 'Email'), { fg: 'red', bg: undefined, bold: true, dim: false, underline: false });
     assert.equal(styleAt(raw, '✗ Enter').fg, 'red');
     assert.equal(session.cart.length, 2, 'nothing ordered yet');
 

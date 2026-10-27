@@ -1,13 +1,13 @@
 import React from 'react';
 import { Text, useAnimation } from 'ink';
-import { glyphs, tones } from '../theme.js';
+import { glyphs, tones, textProps } from '../theme.js';
 
 const h = React.createElement;
 
 /** A braille-dots spinner frame in the accent color. */
-export function Spinner({ color = tones.busy.glyphColor, interval = 80 }) {
+export function Spinner({ token = tones.busy.glyphToken, interval = 80 }) {
   const { frame } = useAnimation({ interval });
-  return h(Text, { color }, glyphs.spinner[frame % glyphs.spinner.length]);
+  return h(Text, textProps(token), glyphs.spinner[frame % glyphs.spinner.length]);
 }
 
 /**
@@ -18,9 +18,9 @@ export function Spinner({ color = tones.busy.glyphColor, interval = 80 }) {
 export function Message({ tone = 'info', children }) {
   const t = tones[tone] ?? tones.info;
   const glyph = tone === 'busy'
-    ? h(Spinner, { color: t.glyphColor })
-    : h(Text, { color: t.glyphColor }, t.glyph);
-  return h(Text, { wrap: 'truncate-end' }, glyph, ' ', h(Text, { color: t.color }, children));
+    ? h(Spinner, { token: t.glyphToken })
+    : h(Text, textProps(t.glyphToken), t.glyph);
+  return h(Text, { wrap: 'truncate-end' }, glyph, ' ', h(Text, textProps(t.textToken), children));
 }
 
 /**

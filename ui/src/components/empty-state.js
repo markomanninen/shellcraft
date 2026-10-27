@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, Text } from 'ink';
-import { theme } from '../theme.js';
+import { textProps } from '../theme.js';
 import { KeyHint } from './key-hint.js';
 
 const h = React.createElement;
@@ -14,12 +14,12 @@ export function EmptyState({ message, hint, k, label }) {
   return h(
     Box,
     { flexDirection: 'column', flexGrow: 1, alignItems: 'center', justifyContent: 'center', width: '100%' },
-    h(Text, { color: theme.text.default, wrap: 'truncate-end' }, message),
+    h(Text, { ...textProps('default'), wrap: 'truncate-end' }, message),
     hint || k
       ? h(
           Text,
           { wrap: 'truncate-end' },
-          hint ? h(Text, { color: theme.text.muted }, hint) : null,
+          hint ? h(Text, textProps('muted'), hint) : null,
           hint && k ? ' ' : null,
           k ? h(KeyHint, { k, label }) : null
         )

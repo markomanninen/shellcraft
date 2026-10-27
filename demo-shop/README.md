@@ -69,7 +69,8 @@ The screens use the shared Ink package [`@shellcraft/ui`](../ui/README.md)
 `.npmrc`). It provides `Screen` (title bar, body, status bar), `Panel`,
 `SelectList`, `Table`, `TextField`, `Button`, `Meter`, `EmptyState`,
 `KeyHint`, `Message` and the SSH adapter `serve()`. Colors come only from
-its theme (ANSI names; cyan for focus and selection, red only for errors).
+its theme (ANSI names; cyan for focus and selection, red only for errors;
+muted text and unfocused borders are the default color dimmed).
 
 The screens follow the Figma templates:
 

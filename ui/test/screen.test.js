@@ -2,13 +2,16 @@ import { describe, it, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import React from 'react';
 import { render, cleanup } from 'ink-testing-library';
-import { Screen, Panel, SelectList, Table, Meter, Box, Text } from '../src/index.js';
-import { renderTerminal, stripAnsi, styleAt } from '../src/testing.js';
+import { Screen, Panel, SelectList, Table, Meter, TextField, Button, EmptyState, Message, Box, Text } from '../src/index.js';
+import { renderTerminal, cleanupTerminals, stripAnsi, styleAt, boldDimText } from '../src/testing.js';
 
 const h = React.createElement;
 const width = (line) => Array.from(line).length;
 
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  cleanupTerminals();
+});
 
 const hints = [['↑↓', 'move'], ['⏎', 'open'], ['q', 'quit']];
 
@@ -94,10 +97,11 @@ describe('Screen', () => {
     });
   }
 
-  it('title bar: app bold cyan, separator gray, screen bold', () => {
+  it('title bar: app bold cyan, separator muted, screen bold', () => {
     const raw = render(menuDetail({ width: 80, height: 24 })).lastFrame();
-    assert.deepEqual(styleAt(raw, 'Admin'), { fg: 'cyan', bg: undefined, bold: true, underline: false });
-    assert.equal(styleAt(raw, '›').fg, 'gray');
+    assert.deepEqual(styleAt(raw, 'Admin'), { fg: 'cyan', bg: undefined, bold: true, dim: false, underline: false });
+    assert.equal(styleAt(raw, '›').fg, undefined);
+    assert.equal(styleAt(raw, '›').dim, true);
     assert.equal(styleAt(raw, 'Dashboard').bold, true);
   });
 
@@ -129,6 +133,37 @@ describe('Screen', () => {
     assert.ok(out[1].endsWith('╮'));
     assert.equal(width(out[1]), 80);
     assert.ok(out[3].endsWith('y… │'), out[3]);
+    t.unmount();
+  });
+
+  it('never combines bold and dim (one intensity attribute on some terminals)', () => {
+    const everything = h(
+      Screen,
+      { app: 'Admin', screen: 'All', meta: 'meta', hints, message: { tone: 'busy', text: 'Working' } },
+      h(
+        Box,
+        { flexGrow: 1 },
+        h(
+          Panel,
+          { title: 'Menu', width: 30, padding: 0 },
+          h(SelectList, { isActive: false, items: [{ label: 'One', hint: '1' }, { label: 'Off', hint: '2', disabled: true }] }),
+          h(Table, { isActive: false, selectedIndex: -1, columns: [{ label: 'Head', width: 8 }], rows: [['cell']] })
+        ),
+        h(
+          Panel,
+          { title: 'Detail', focused: true },
+          h(Meter, { label: 'CPU', value: 50 }),
+          h(TextField, { label: 'Name', placeholder: 'Your name' }),
+          h(TextField, { label: 'Email', value: 'x@', error: 'Enter a full address' }),
+          h(Button, { label: 'Save' }),
+          h(Message, { tone: 'info' }, 'Info'),
+          h(Box, { height: 4 }, h(EmptyState, { message: 'Nothing here.', hint: 'Go', k: 'b', label: 'back' }))
+        )
+      )
+    );
+    const t = renderTerminal(everything, { columns: 80, rows: 24 });
+    assert.ok(t.lastFrame().includes('\u001B[2m'), 'muted text is dim');
+    assert.equal(boldDimText(t.lastFrame()), '');
     t.unmount();
   });
 

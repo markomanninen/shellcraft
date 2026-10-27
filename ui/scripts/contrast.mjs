@@ -1,6 +1,7 @@
-// Contrast of muted text (ANSI 8, "bright black", chalk 'gray') on the
-// terminal background, for common terminal themes. Prints the Markdown
-// table used in ui/README.md:  node scripts/contrast.mjs
+// Contrast of ANSI 8 ("bright black", chalk 'gray', the first muted color)
+// on the terminal background, for common terminal themes: the reason muted
+// text is now dim (SGR 2) instead. Prints the Markdown table used in
+// ui/README.md:  node scripts/contrast.mjs
 //
 // WCAG 2.x relative luminance and contrast ratio:
 // https://www.w3.org/TR/WCAG21/#dfn-contrast-ratio
