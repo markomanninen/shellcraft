@@ -1,112 +1,69 @@
-import { UIComponents } from './components.js';
+import React from 'react';
+import { Box, Panel, SelectList } from '@shellcraft/ui';
+import { AdminScreen } from './parts.js';
+import { OverviewSummary } from './overview.js';
+import { ResourcesSummary } from './resources.js';
+import { ProcessesSummary } from './processes.js';
+import { LogsSummary } from './logs.js';
+import { NetworkSummary } from './network.js';
+import { ServicesSummary } from './services.js';
+import { SettingsSummary } from './settings.js';
 
-export class DashboardScreen {
-  constructor(context) {
-    this.context = context;
-    this.screen = context.screen;
-    this.render();
-  }
+const h = React.createElement;
 
-  render() {
-    const header = UIComponents.createBox({
-      parent: this.screen,
-      top: 0,
-      left: 0,
-      width: '100%',
-      height: 3,
-      content: '{center}{bold}{cyan-fg}SYSTEM ADMIN DASHBOARD{/}',
-      tags: true,
-      style: {
-        border: { fg: 'cyan' }
-      }
-    });
+/**
+ * The menu: label, number hint, the screen ⏎ opens and the summary the
+ * detail panel shows while the item is highlighted. `flush`: the summary
+ * is a table, whose rows bring their own one-cell padding.
+ */
+export const MENU = [
+  { label: 'System overview', hint: '1', screen: 'overview', Summary: OverviewSummary },
+  { label: 'CPU & memory', hint: '2', screen: 'resources', Summary: ResourcesSummary },
+  { label: 'Processes', hint: '3', screen: 'processes', Summary: ProcessesSummary, flush: true },
+  { label: 'Logs', hint: '4', screen: 'logs', Summary: LogsSummary },
+  { label: 'Network', hint: '5', screen: 'network', Summary: NetworkSummary },
+  { label: 'Services', hint: '6', screen: 'services', Summary: ServicesSummary },
+  { label: 'Settings', hint: '7', screen: 'settings', Summary: SettingsSummary }
+];
 
-    const menu = UIComponents.createList({
-      parent: this.screen,
-      top: 4,
-      left: 'center',
-      width: '60%',
-      height: 14,
-      label: ' Dashboard Menu ',
-      items: [
-        '  System Overview',
-        '  CPU & Memory',
-        '  Process Monitor',
-        '  System Logs',
-        '  Network Info',
-        '  Services Status',
-        '  Settings',
-        '  Exit'
-      ],
-      keys: false,
-      vi: false
-    });
+export const MENU_WIDTH = 30;
 
-    let menuActive = false;
-    const handleSelect = (index) => {
-      if (!menuActive) return;
-      switch(index) {
-        case 0:
-          this.context.navigate('overview');
-          break;
-        case 1:
-          this.context.navigate('resources');
-          break;
-        case 2:
-          this.context.navigate('processes');
-          break;
-        case 3:
-          this.context.navigate('logs');
-          break;
-        case 4:
-          this.context.navigate('network');
-          break;
-        case 5:
-          this.context.navigate('services');
-          break;
-        case 6:
-          this.context.navigate('settings');
-          break;
-        case 7:
-          this.context.exit();
-          break;
-      }
-    };
+/**
+ * Home, the Figma "Menu + detail" template: the menu (30 cells) has focus,
+ * the detail panel beside it summarises the highlighted item and follows
+ * the selection; ⏎ opens the full screen, 1-7 jump. No Exit item: q quits.
+ */
+export function DashboardScreen({ ctx }) {
+  const index = Math.min(Math.max(ctx.menuIndex, 0), MENU.length - 1);
+  const item = MENU[index];
 
-    menu.on('select', (_item, index) => handleSelect(index));
-
-    const footer = UIComponents.createBox({
-      parent: this.screen,
-      bottom: 0,
-      left: 0,
-      width: '100%',
-      height: 3,
-      content: '{center}Use arrows | Enter to select | q to quit{/}',
-      tags: true,
-      style: { fg: 'gray' }
-    });
-
-    // Explicit arrow/enter key routing (blessed focus workaround)
-    this.screen.key(['up'], () => {
-      if (!menuActive) return;
-      menu.up();
-      this.screen.render();
-    });
-    this.screen.key(['down'], () => {
-      if (!menuActive) return;
-      menu.down();
-      this.screen.render();
-    });
-    this.screen.key(['enter'], () => {
-      if (!menuActive) return;
-      handleSelect(menu.selected);
-    });
-
-    setTimeout(() => {
-      menuActive = true;
-      menu.select(0);
-      menu.focus();
-      this.screen.render();
-    }, 0);
-  }
+  return h(
+    AdminScreen,
+    {
+      ctx,
+      screen: 'Dashboard',
+      hints: [['↑↓', 'move'], ['⏎', 'open'], [`1-${MENU.length}`, 'jump'], ['q', 'quit']]
+    },
+    h(
+      Box,
+      { flexGrow: 1 },
+      h(
+        Panel,
+        { title: 'Menu', focused: true, width: MENU_WIDTH, padding: 0 },
+        h(SelectList, {
+          items: MENU,
+          selectedIndex: index,
+          onChange: ctx.setMenuIndex,
+          onSelect: (_i, selected) => ctx.navigate(selected.screen)
+        })
+      ),
+      h(
+        Panel,
+        { title: item.label, paddingX: item.flush ? 0 : 1 },
+        // Keyed by item: moving the selection mounts the next summary and
+        // unmounts the last one (and its refresh timer).
+        h(item.Summary, { key: item.screen, ctx })
+      )
+    )
+  );
 }

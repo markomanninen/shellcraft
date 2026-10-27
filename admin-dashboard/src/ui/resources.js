@@ -1,92 +1,100 @@
-import { UIComponents } from './components.js';
-import { SystemModel } from '../models/system.js';
+import React from 'react';
+import { Box, Panel, Meter, ScrollView, METER_WIDTH, useTerminalSize } from '@shellcraft/ui';
+import {
+  AdminScreen, Blank, InfoRow, infoRows, meterTone, screenHints, useData, useScreenKeys,
+  SUMMARY_LABEL_WIDTH
+} from './parts.js';
 
-export class ResourcesScreen {
-  constructor(context) {
-    this.context = context;
-    this.screen = context.screen;
-    this.systemModel = new SystemModel();
-    this.render();
+const h = React.createElement;
+
+const METER_GAP = 4;
+
+export function resourcesData(system) {
+  const cores = system.getCPUUsage();
+  const cpu = cores.length ? cores.reduce((sum, c) => sum + c.percent, 0) / cores.length : 0;
+  return { cores, cpu, memory: system.getMemoryUsage() };
+}
+
+/** "Apple M2 Pro" or, for mixed cores, the distinct models joined. */
+const cpuModels = (cores) => [...new Set(cores.map((c) => String(c.model ?? '').trim()))].filter(Boolean).join(', ') || 'unknown';
+
+const coreMeter = (core) =>
+  h(Meter, { key: `core-${core.core}`, label: `Core ${core.core}`, value: core.percent, tone: meterTone(core.percent) });
+
+/** Per-core meters, `perRow` side by side, one element per row. */
+function coreMeterRows(cores, perRow) {
+  const rows = [];
+  for (let i = 0; i < cores.length; i += perRow) {
+    rows.push(
+      h(
+        Box,
+        { key: `cores-${i}`, height: 1, flexShrink: 0 },
+        ...cores.slice(i, i + perRow).map((core, j) =>
+          h(Box, { key: `c${core.core}`, marginLeft: j === 0 ? 0 : METER_GAP, flexShrink: 0 }, coreMeter(core))
+        )
+      )
+    );
   }
+  return rows;
+}
 
-  render() {
-    const header = UIComponents.createBox({
-      parent: this.screen,
-      top: 0,
-      left: 0,
-      width: '100%',
-      height: 3,
-      content: '{center}{bold}{blue-fg}CPU & MEMORY{/}',
-      tags: true
-    });
+/** Home detail panel for "CPU & memory": totals, then one meter per core. */
+export function ResourcesSummary({ ctx }) {
+  const { data } = useData(() => resourcesData(ctx.system), { interval: ctx.refreshMs });
+  const { cores, cpu, memory } = data;
+  return h(
+    Box,
+    { flexDirection: 'column', flexGrow: 1 },
+    ...infoRows([
+      ['Model', cpuModels(cores)],
+      ['Cores', String(cores.length)],
+      ['Memory', `${memory.used} of ${memory.total}`]
+    ], SUMMARY_LABEL_WIDTH),
+    h(Blank),
+    h(Meter, { label: 'CPU', value: cpu, tone: meterTone(cpu) }),
+    h(Meter, { label: 'Memory', value: memory.usedPercent, tone: meterTone(memory.usedPercent) }),
+    h(Blank),
+    h(ScrollView, { rows: coreMeterRows(cores, 1), isActive: false })
+  );
+}
 
-    const cpuUsage = this.systemModel.getCPUUsage();
+/**
+ * CPU & memory: overall and per-core meters (as many side by side as fit),
+ * memory totals. Refreshes every 2 s; scrolls when there are more cores
+ * than rows.
+ */
+export function ResourcesScreen({ ctx }) {
+  const { data, refresh } = useData(() => resourcesData(ctx.system), { interval: ctx.refreshMs });
+  useScreenKeys(ctx, refresh);
+  const { columns, rows } = useTerminalSize();
+  const { cores, cpu, memory } = data;
 
-    const cpuTable = UIComponents.createTable({
-      parent: this.screen,
-      top: 4,
-      left: 2,
-      width: '96%',
-      height: cpuUsage.length + 4,
-      label: ' CPU Cores ',
-      data: [
-        ['Core', 'Model', 'Usage'],
-        ...cpuUsage.map(cpu => [
-          cpu.core.toString(),
-          cpu.model.substring(0, 40),
-          cpu.usage
-        ])
-      ],
-      style: {
-        border: { fg: 'green' }
-      }
-    });
+  // Panel: two borders and one cell of padding on each side.
+  const width = Math.max(columns - 4, 1);
+  // Title bar, panel top and bottom, padding, status bar.
+  const height = Math.max(rows - 6, 1);
+  const perRow = Math.max(Math.floor((width + METER_GAP) / (METER_WIDTH + METER_GAP)), 1);
 
-    const memory = this.systemModel.getMemoryUsage();
+  const content = [
+    h(InfoRow, { key: 'model', label: 'Model', value: cpuModels(cores) }),
+    h(InfoRow, { key: 'cores', label: 'Cores', value: String(cores.length) }),
+    h(Blank, { key: 'b1' }),
+    h(Meter, { key: 'cpu', label: 'CPU', value: cpu, tone: meterTone(cpu) }),
+    ...coreMeterRows(cores, perRow),
+    h(Blank, { key: 'b2' }),
+    h(Meter, { key: 'memory', label: 'Memory', value: memory.usedPercent, tone: meterTone(memory.usedPercent) }),
+    h(InfoRow, { key: 'total', label: 'Total', value: memory.total }),
+    h(InfoRow, { key: 'used', label: 'Used', value: memory.used }),
+    h(InfoRow, { key: 'free', label: 'Free', value: memory.free })
+  ];
 
-    const memBox = UIComponents.createBox({
-      parent: this.screen,
-      top: cpuUsage.length + 9,
-      left: 2,
-      width: '96%',
-      height: 8,
-      label: ' Memory Details ',
-      content: `
-  {bold}Total Memory:{/}    ${memory.total}
-  {bold}Used Memory:{/}     ${memory.used}
-  {bold}Free Memory:{/}     ${memory.free}
-  {bold}Usage Percent:{/}   ${memory.percent}
-
-  {yellow-fg}Press 'r' to refresh{/}
-`,
-      tags: true,
-      style: {
-        border: { fg: 'magenta' }
-      }
-    });
-
-    const backBtn = UIComponents.createButton({
-      parent: this.screen,
-      bottom: 3,
-      left: 'center',
-      width: 15,
-      height: 3,
-      content: ' Back ',
-      name: 'back'
-    });
-
-    backBtn.on('press', () => {
-      this.context.navigate('dashboard');
-    });
-
-    this.screen.key(['r'], () => {
-      this.context.navigate('resources');
-    });
-
-    this.screen.key(['b', 'escape'], () => {
-      this.context.navigate('dashboard');
-    });
-
-    backBtn.focus();
-  }
+  return h(
+    AdminScreen,
+    { ctx, screen: 'CPU & memory', hints: screenHints({ scroll: content.length > height, refresh: true }) },
+    h(
+      Panel,
+      { title: 'CPU & memory', focused: true },
+      h(ScrollView, { rows: content, height, width })
+    )
+  );
 }
