@@ -17,7 +17,7 @@ jobs:
     
     strategy:
       matrix:
-        app: [demo-shop, admin-dashboard, adventure-game, animation-demo]
+        app: [ui, demo-shop, admin-dashboard, adventure-game, animation-demo]
       fail-fast: false
     
     steps:

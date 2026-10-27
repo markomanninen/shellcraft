@@ -15,7 +15,7 @@ jobs:
     
     strategy:
       matrix:
-        app: [demo-shop, admin-dashboard, adventure-game, animation-demo]
+        app: [ui, demo-shop, admin-dashboard, adventure-game, animation-demo]
     
     steps:
     - name: Checkout repository
@@ -33,7 +33,7 @@ jobs:
       run: npm ci
       
     - name: Generate SSH keys for E2E tests
-      if: matrix.app != 'animation-demo'
+      if: matrix.app != 'animation-demo' && matrix.app != 'ui'
       working-directory: ${{ matrix.app }}
       run: npm run generate-keys
     
