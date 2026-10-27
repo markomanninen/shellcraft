@@ -13,7 +13,11 @@ export { TextField } from './components/text-field.js';
 export { Button } from './components/button.js';
 export { Meter, meterCells, METER_WIDTH } from './components/meter.js';
 export { EmptyState } from './components/empty-state.js';
+export { ScrollView, MoreIndicator } from './components/scroll-view.js';
+export { useInterval } from './hooks.js';
+export { wrapText, textWidth } from './text.js';
 export { serve, toCrlf } from './ssh.js';
+export { renderLocal } from './local.js';
 export { colorLevel } from './color.js';
 
 // Re-exported so apps can import everything from one place.

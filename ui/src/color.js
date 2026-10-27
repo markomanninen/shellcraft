@@ -10,23 +10,14 @@
 // imported first, and leaves process.env alone.
 //
 // Opt out (no colors at all) with FORCE_COLOR=0 or NO_COLOR=1.
-import { createRequire } from 'node:module';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { importFromInk } from './ink-deps.js';
 
 const env = process.env;
 export const colorDisabled =
   env.FORCE_COLOR === '0' || env.FORCE_COLOR === 'false' || (env.NO_COLOR !== undefined && env.NO_COLOR !== '');
 
-let inkChalk = null;
-try {
-  // Resolve chalk from Ink's own location, so this is the very instance
-  // Ink's <Text> uses (also with nested node_modules or pnpm).
-  const inkEntry = fileURLToPath(import.meta.resolve('ink'));
-  const chalkPath = createRequire(inkEntry).resolve('chalk');
-  inkChalk = (await import(pathToFileURL(chalkPath).href)).default;
-} catch {
-  inkChalk = null;
-}
+// The very chalk instance Ink's <Text> uses.
+const inkChalk = await importFromInk('chalk');
 
 if (inkChalk) {
   inkChalk.level = colorDisabled ? 0 : 1;

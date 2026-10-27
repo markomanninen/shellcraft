@@ -93,9 +93,11 @@ works at 100×30 and wider.
 | `KeyHint` | `k, label` | `q quit`: key bold cyan, verb muted. |
 | `Message` | `tone: info\|success\|warning\|error\|busy`, children | `i` / `✓` / `!` / `✗` / spinner + text, one line. |
 | `Panel` | `title, focused, width?, height?, padding = 1` | Round border with the title in the top edge: `╭─ Title ───╮`. Lists and tables use `padding={0}`. |
-| `SelectList` / `ListItem` | `items: [{label, hint, disabled}], selectedIndex, onChange, onSelect, isActive, height?` | ↑↓ (k/j) move, ⏎ select, 1-9 jump. Selected row: cyan fill, black bold, `›`. |
-| `Table` / `TableRow` | `columns: [{label, width, align, grow}], rows, selectedIndex, onChange, onSelect, isActive, height?` | Header muted and underlined, no rules, cells truncate, 1 space between columns. `selectedIndex={-1}`: no selection bar. |
-| `TextField` | `label, value, focused, editing = focused, error, placeholder, onChange, onSubmit, onCancel` | Label 11 cells, value 30 cells underlined; editing shows `█` and takes keys; error adds `✗ message` under the value. |
+| `SelectList` / `ListItem` | `items: [{label, hint, disabled}], selectedIndex, onChange, onSelect, isActive, height?` | ↑↓ (k/j) move, ⏎ select, 1-9 jump. Selected row: cyan fill, black bold, `›`. With `height`, scrolls to keep the selection in view, with `↑ N more` / `↓ N more` rows. |
+| `Table` / `TableRow` | `columns: [{label, width, align, grow}], rows, selectedIndex, onChange, onSelect, isActive, height?` | Header muted and underlined, no rules, cells truncate, 1 space between columns. `selectedIndex={-1}`: no selection bar. `height` = body rows; see Scrolling. |
+| `TextField` | `label, value, focused, editing = focused, error, placeholder, onChange, onSubmit, onCancel, labelWidth = 11, valueWidth = 30` | Label column, value underlined; editing shows `█` (always at the end) and takes keys; error adds `✗ message` under the value. `valueWidth: 'fill'` takes the rest of the row; `labelWidth: 0` drops the label column. |
+| `ScrollView` | `text \| lines \| rows, height?, width?, hangingIndent = 0, keepIndent = true, follow, offset, onOffsetChange, isActive` | Fixed-height scrolling region; see Scrolling. |
+| `MoreIndicator` | `direction: 'up'\|'down', count, indent` | The dim `↑ N more` row the scrolling components use. |
 | `Button` | `label, focused` | `[ label ]`; focused = cyan fill. Form actions only. |
 | `Meter` | `label, value, max = 100, display?, tone` | 36 cells: label 8, bar 20, value 8 right-aligned. |
 | `EmptyState` | `message, hint, k, label` | Centered, no box, no red. |
@@ -103,6 +105,49 @@ works at 100×30 and wider.
 Controlled lists: pass `selectedIndex` and `onChange`; without `onChange`
 the component keeps its own selection. Only the focused list should have
 `isActive` (the default) so keys go to one place.
+
+Also exported: `useInterval(callback, ms)` (periodic refresh; the latest
+callback is used, `ms` null pauses, cleared on unmount; for animation frames
+use Ink's `useAnimation`), `wrapText(text, width, { hangingIndent,
+keepIndent })` and `textWidth(text)` (cells, from Ink's string-width), and
+the theme helpers.
+
+### Scrolling
+
+`ScrollView`, `Table` and `SelectList` with a `height` show a window of
+their content. When content is hidden, the first row says `↑ N more` and the
+last `↓ N more` (dim; no colored scrollbar). Windows under 3 rows get no
+indicators.
+
+`ScrollView` takes one of:
+
+- `text`: a string; `"\n"` separates paragraphs, each is word-wrapped;
+- `lines`: `[string | { text, tone, bold, hangingIndent }]`, each wrapped,
+  `tone` a theme text token (`'muted'`, `'success'`, ...);
+- `rows`: `[node]`, one row each, not wrapped.
+
+Wrapping keeps a paragraph's leading spaces on its wrapped lines
+(`keepIndent`), plus `hangingIndent` cells, so an indented narrative
+paragraph stays indented and `T1 Arrived ...` log lines wrap under the text
+(`hangingIndent: 3`). Long words are broken; wide characters count two
+cells. Without `height`/`width` the view fills its parent (flexGrow) and
+measures itself, which costs one extra render on mount; pass them when you
+know the size. Keys while `isActive`: ↑↓ / k j, PgUp PgDn, Home End.
+`follow` keeps the view at the end as lines are added until the user scrolls
+up (logs, a story). `offset` + `onOffsetChange` make it controlled.
+
+```js
+h(Panel, { title: 'Story', focused: true },
+  h(ScrollView, { lines: story, follow: true }),          // fills the panel
+  h(TextField, { label: '>', labelWidth: 2, valueWidth: 'fill',
+                 value, focused: true, onChange: setValue, onSubmit: act }))
+```
+
+`Table` with `height` keeps its header; the body rows scroll so the
+selected row stays visible (↑↓, PgUp PgDn, Home End move the selection).
+With `selectedIndex={-1}` the same keys scroll the rows. Work the height out
+from the terminal: `useTerminalSize().rows` minus the rows around the table
+(title bar, panel edges and padding, header, status bar).
 
 ## SSH: `serve()`
 
@@ -162,6 +207,25 @@ output into a headless xterm):
   listener per instance (Node warns at 11); `serve()` removes it, since a
   server's event loop never runs dry.
 
+## Local terminal: `renderLocal()`
+
+For apps that run in the local terminal instead of over SSH
+(animation-demo):
+
+```js
+const cleanup = renderLocal(h(App), { quitKeys: ['q'] });
+await cleanup.exited;          // the process can then exit on its own
+```
+
+`renderLocal(element, { stdin, stdout, quitKeys = [], altScreen = true,
+incrementalRendering = true, onExit })` shares the full-screen code with
+`serve()` (`src/fullscreen.js`): alternate screen with the cursor homed, a
+Screen exactly the terminal's size, synchronous relayout on `'resize'`
+(SIGWINCH) before Ink redraws, Ctrl-C and `quitKeys` exit, the alternate
+screen left while Ink unmounts, so also on SIGINT/SIGTERM. No CRLF
+translation: a local tty does that itself. Returns `cleanup()` with
+`.exited` and `.instance`. `serve()` takes `quitKeys` too.
+
 ## Testing helpers
 
 `@shellcraft/ui/testing` (used by the ui tests and the apps' tests):
@@ -169,11 +233,20 @@ output into a headless xterm):
 - `renderTerminal(element, { columns, rows })`: render on a fake terminal of
   that size; `text()`, `lines()`, `lastFrame()`, `press('down', 'enter', 'a')`,
   `resize(cols, rows)`, `unmount()`, `waitUntilExit()`.
-- `styleAt(rawFrame, text)`: `{ fg, bg, bold, underline }` of a text on screen.
+- `cleanupTerminals()`: unmount everything `renderTerminal` mounted; call
+  it in `afterEach` so a failing test cannot leave a spinner or interval
+  keeping the process alive.
+- `styleAt(rawFrame, text)`: `{ fg, bg, bold, dim, underline }` of a text on
+  screen; `styleAtCell(rawFrame, row, column)` for a cell.
+- `boldDimText(rawFrame)`: characters that are bold and dim at once (should
+  be `''`).
 - `stripAnsi`, `keys`, `tick`.
 - `FakeSshChannel`, `FakeSshSession`: a duplex stand-in for an ssh2 channel
   (`type()`, `disconnect()`, `exitCode`) and a session that emits
   `'window-change'`.
+- `createFakeTty({ columns, rows, onOutput })`: TTY stdin/stdout for
+  `renderLocal` tests (`type()`, `resize()`, `stdin.rawMode`). Feed the
+  output to `@xterm/headless` with `convertEol: true` (the tty's ONLCR).
 
 `npm test` runs `node --test test/*.test.js`.
 

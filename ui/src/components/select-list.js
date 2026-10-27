@@ -1,7 +1,8 @@
 import React from 'react';
 import { Box, Text, useInput } from 'ink';
 import { theme, glyphs, textProps } from '../theme.js';
-import { useSelection, stepIndex, windowStart } from '../selection.js';
+import { useSelection, useFollowSelection, stepIndex, scrollLayout } from '../selection.js';
+import { MoreIndicator } from './scroll-view.js';
 
 const h = React.createElement;
 
@@ -51,7 +52,8 @@ export function ListItem({ label, hint, selected = false, disabled = false }) {
  * selectedIndex + onChange(index): controlled; without onChange the list
  *   keeps its own selection.
  * isActive: whether this list takes keys (the focused one).
- * height: visible rows; longer lists scroll to keep the selection visible.
+ * height: visible rows; longer lists scroll to keep the selection visible,
+ *   with `↑ N more` / `↓ N more` in the first and last row.
  */
 export function SelectList({
   items = [],
@@ -82,20 +84,26 @@ export function SelectList({
     { isActive: isActive && items.length > 0 }
   );
 
-  const start = windowStart(items.length, index, height);
-  const visible = height ? items.slice(start, start + height) : items;
+  const following = useFollowSelection(items.length, height, index);
+  const layout = height
+    ? scrollLayout(items.length, height, following)
+    : { offset: 0, count: items.length, above: 0, below: 0, top: false, bottom: false };
+  const visible = items.slice(layout.offset, layout.offset + layout.count);
 
   return h(
     Box,
     { flexDirection: 'column', flexShrink: 0, width: '100%' },
+    // Indicators line up with the labels (padding 1 + marker 2).
+    layout.top ? h(MoreIndicator, { key: 'up', direction: 'up', count: layout.above, indent: 3 }) : null,
     ...visible.map((item, i) =>
       h(ListItem, {
-        key: `${start + i}`,
+        key: `${layout.offset + i}`,
         label: item.label,
         hint: item.hint,
         disabled: item.disabled,
-        selected: start + i === index
+        selected: layout.offset + i === index
       })
-    )
+    ),
+    layout.bottom ? h(MoreIndicator, { key: 'down', direction: 'down', count: layout.below, indent: 3 }) : null
   );
 }

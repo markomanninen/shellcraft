@@ -48,3 +48,53 @@ export function windowStart(count, selected, height) {
   const start = sel - Math.floor(height / 2);
   return Math.min(Math.max(start, 0), count - height);
 }
+
+// Scrolling with "↑ N more" / "↓ N more" rows. A window of `height` rows
+// over `total` items starting at item `offset`: when items are hidden above,
+// the first row is the "↑" indicator; when items are hidden below, the last
+// row is the "↓" indicator. Windows under 3 rows get no indicators.
+
+/** { offset, count, above, below, top, bottom } for a window. */
+export function scrollLayout(total, height, offset = 0) {
+  const h = Math.max(Math.floor(height) || 0, 0);
+  if (total <= h || h === 0) return { offset: 0, count: Math.min(total, h), above: 0, below: Math.max(total - h, 0), top: false, bottom: false };
+  const o = Math.min(Math.max(Math.floor(offset) || 0, 0), maxScrollOffset(total, h));
+  if (h < 3) {
+    return { offset: o, count: h, above: o, below: total - o - h, top: false, bottom: false };
+  }
+  const top = o > 0;
+  const rest = h - (top ? 1 : 0);
+  const bottom = o + rest < total;
+  const count = rest - (bottom ? 1 : 0);
+  return { offset: o, count, above: o, below: total - o - count, top, bottom };
+}
+
+/** The largest useful offset: the last item sits on the last row. */
+export function maxScrollOffset(total, height) {
+  const h = Math.max(Math.floor(height) || 0, 0);
+  if (total <= h || h === 0) return 0;
+  if (h < 3) return total - h;
+  return total - h + 1; // the "↑" row takes one row at the end
+}
+
+/** Smallest change to `offset` that keeps item `index` in the window. */
+export function scrollToVisible(total, height, offset, index) {
+  const max = maxScrollOffset(total, height);
+  let o = Math.min(Math.max(Math.floor(offset) || 0, 0), max);
+  if (index < 0 || index >= total) return o;
+  if (index < o) return index;
+  while (o < max && index >= o + scrollLayout(total, height, o).count) o++;
+  return o;
+}
+
+/**
+ * Window offset for a list or table of `total` rows shown `height` at a
+ * time that keeps `index` visible, moving as little as possible from the
+ * previous render's offset (so the selection does not jump to the middle).
+ */
+export function useFollowSelection(total, height, index) {
+  const previous = useRef(0);
+  const offset = height ? scrollToVisible(total, height, previous.current, index) : 0;
+  previous.current = offset;
+  return offset;
+}

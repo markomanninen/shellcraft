@@ -129,9 +129,12 @@ class FakeStdin extends EventEmitter {
     super();
     this.isTTY = true;
     this.queue = [];
+    this.rawMode = false;
   }
 
-  setRawMode() {}
+  setRawMode(enabled) {
+    this.rawMode = Boolean(enabled);
+  }
   setEncoding() {}
   resume() {}
   pause() {}
@@ -279,4 +282,50 @@ export class FakeSshSession extends EventEmitter {
     this.emit('window-change', () => { accepted = true; }, () => {}, { cols, rows, width: 0, height: 0 });
     return accepted;
   }
+}
+
+/**
+ * A local terminal for renderLocal() tests: a TTY stdin (records raw mode)
+ * and a TTY stdout of columns x rows whose bytes go to onOutput(text, done)
+ * (e.g. a headless xterm) and to .output.
+ *   type(data): the user types; resize(cols, rows): SIGWINCH.
+ */
+export function createFakeTty({ columns = 80, rows = 24, onOutput = (_text, done) => done() } = {}) {
+  const stdin = new FakeStdin();
+  const output = [];
+  const stdout = new (class extends EventEmitter {
+    constructor() {
+      super();
+      this.isTTY = true;
+      this.columns = columns;
+      this.rows = rows;
+      this.writable = true;
+    }
+
+    write(data, encoding, callback) {
+      if (typeof encoding === 'function') callback = encoding;
+      const text = String(data);
+      output.push(text);
+      onOutput(text, () => {
+        if (typeof callback === 'function') callback();
+      });
+      return true;
+    }
+  })();
+  return {
+    stdin,
+    stdout,
+    output,
+    takeOutput() {
+      return output.splice(0).join('');
+    },
+    type(data) {
+      stdin.write(data);
+    },
+    resize(nextColumns, nextRows) {
+      stdout.columns = nextColumns;
+      stdout.rows = nextRows;
+      stdout.emit('resize');
+    }
+  };
 }

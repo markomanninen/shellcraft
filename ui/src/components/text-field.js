@@ -1,6 +1,7 @@
 import React, { useRef } from 'react';
-import { Box, Text, useInput } from 'ink';
+import { Box, Text, useInput, useBoxMetrics } from 'ink';
 import { glyphs, textProps, borderTextProps } from '../theme.js';
+import { textWidth, splitAtWidth, tailToWidth } from '../text.js';
 
 const h = React.createElement;
 
@@ -21,7 +22,13 @@ const chars = (s) => Array.from(s ?? '');
  *
  * Keys while editing (only when onChange is given): printable text is
  * appended, backspace/delete removes the last character, ⏎ calls
- * onSubmit(value), esc calls onCancel().
+ * onSubmit(value), esc calls onCancel(). The cursor stays at the end (no
+ * ←/→ editing).
+ *
+ * Widths in cells: labelWidth (11; 0 for no label column) and valueWidth
+ * (30, or 'fill' for the rest of the row, e.g. a free-text prompt across a
+ * panel). A value longer than the field scrolls: while editing the end
+ * stays in view (`…` + tail + cursor), otherwise it is cut with `…`.
  */
 export function TextField({
   label,
@@ -70,6 +77,11 @@ export function TextField({
     { isActive: Boolean(editing && focused && onChange) }
   );
 
+  const fillRef = useRef(null);
+  const metrics = useBoxMetrics(fillRef);
+  const fills = valueWidth === 'fill';
+  const cells = fills ? (metrics.hasMeasured ? metrics.width : 0) : Math.max(Number(valueWidth) || 0, 0);
+
   const hasError = Boolean(error);
   const showCursor = Boolean(focused && editing);
   const state = hasError ? 'danger' : focused ? 'focus' : 'default';
@@ -79,37 +91,41 @@ export function TextField({
   const lineProps = borderTextProps(state);
 
   // Value cells: text, optional cursor, then underlined spaces up to the width.
-  const room = Math.max(valueWidth - (showCursor ? 1 : 0), 0);
-  const valueChars = chars(value);
+  const room = Math.max(cells - (showCursor ? 1 : 0), 0);
   let shown;
   let shownProps = textProps('default');
-  if (valueChars.length === 0) {
-    shown = showCursor ? '' : chars(placeholder).slice(0, room).join('');
+  if (value === '') {
+    shown = showCursor ? '' : splitAtWidth(placeholder, room)[0];
     shownProps = textProps('muted');
-  } else if (valueChars.length <= room) {
+  } else if (textWidth(value) <= room) {
     shown = value;
   } else if (showCursor) {
     // Editing: keep the end of the value (where the cursor is) in view.
-    shown = '…' + valueChars.slice(valueChars.length - room + 1).join('');
+    shown = room > 1 ? '…' + tailToWidth(value, room - 1) : '';
   } else {
-    shown = valueChars.slice(0, room - 1).join('') + '…';
+    shown = room > 1 ? splitAtWidth(value, room - 1)[0] + '…' : '';
   }
-  const fill = Math.max(valueWidth - chars(shown).length - (showCursor ? 1 : 0), 0);
+  const fill = Math.max(cells - textWidth(shown) - (showCursor ? 1 : 0), 0);
 
   return h(
     Box,
-    { flexDirection: 'column', flexShrink: 0 },
+    // 'fill' takes the parent's width, in a row as in a column.
+    { flexDirection: 'column', flexShrink: 0, ...(fills ? { width: '100%' } : {}) },
     h(
       Box,
       { height: 1 },
+      labelWidth > 0
+        ? h(
+            Box,
+            { width: labelWidth, flexShrink: 0, overflow: 'hidden' },
+            h(Text, { ...labelProps, wrap: 'truncate-end' }, label)
+          )
+        : null,
       h(
         Box,
-        { width: labelWidth, flexShrink: 0, overflow: 'hidden' },
-        h(Text, { ...labelProps, wrap: 'truncate-end' }, label)
-      ),
-      h(
-        Box,
-        { width: valueWidth, flexShrink: 0, overflow: 'hidden' },
+        fills
+          ? { ref: fillRef, flexGrow: 1, flexShrink: 1, flexBasis: 0, overflow: 'hidden' }
+          : { width: cells, flexShrink: 0, overflow: 'hidden' },
         h(
           Text,
           { wrap: 'truncate-end' },
