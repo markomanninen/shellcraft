@@ -1,75 +1,87 @@
 # Feature Comparison
 
-Side-by-side comparison of all four demo applications.
+The four demo apps side by side. All four build their screens with Ink
+through [`@shellcraft/ui`](ui/README.md) and follow the same
+[design rules](DESIGN_PRINCIPLES.md).
 
 ## Overview
 
 | Feature | Demo Shop | Adventure Game | Admin Dashboard | Animation Demo |
 |---------|-----------|----------------|-----------------|----------------|
-| SSH server | Yes | Yes | Yes | No |
+| Runs over | SSH | SSH | SSH | local terminal |
+| Started by | `serve()` | `serve()` | `serve()` | `renderLocal()` |
 | Default port | 2222 | 2222 | 2222 | N/A |
-| Authentication | None (demo) | None (username as session key) | None (demo) | N/A |
-| Session storage | In-memory | JSON file on disk | In-memory | None |
-| Session identity | SSH key fingerprint | SSH username | SSH key fingerprint | N/A |
-| Persists across restart | No | Yes | No | N/A |
-| LLM integration | No | Yes (Ollama) | No | No |
+| Authentication | none (demo) | none (user name is the session key) | none (demo) | N/A |
+| Session storage | in memory | JSON file on disk | in memory | none |
+| Session identity | SSH key fingerprint | SSH user name | SSH key fingerprint | N/A |
+| Survives a restart | no | yes | no | N/A |
+| LLM integration | no | yes (Ollama) | no | no |
 
 ## Screens
 
-| Screen Type | Demo Shop | Adventure Game | Admin Dashboard | Animation Demo |
+| Screen type | Demo Shop | Adventure Game | Admin Dashboard | Animation Demo |
 |-------------|-----------|----------------|-----------------|----------------|
-| Main menu | Home | Game menu | Dashboard | Animation viewer |
-| Data display | Products | Room description | Overview, Resources, Network, Services | N/A |
-| Interactive | Cart, Checkout | Room actions, Free-text input | Process monitor, Logs | Animation switching |
-| Info / Help | -- | Help, Stats, Inventory | Settings | -- |
-| Loading | -- | Wizard animation (LLM) | -- | -- |
+| Main menu | Home (menu + cart) | game menu | dashboard menu | animation list |
+| Data display | Products table | room description | overview, resources, network, services | the animation |
+| Interactive | Cart, Checkout form | room actions, free-text input | processes, logs | switch, speed, pause |
+| Info | -- | help, stats, inventory | settings | -- |
+| Waiting | -- | loading animation (LLM) | -- | -- |
 
 ## Technology
 
 | Component | Demo Shop | Adventure Game | Admin Dashboard | Animation Demo |
 |-----------|-----------|----------------|-----------------|----------------|
-| ssh2 | Yes | Yes | Yes | No |
-| blessed | Yes | Yes | Yes | Yes |
-| dotenv | Yes | Yes | Yes | No |
-| nanoid | Yes | Yes | Yes | No |
-| nodemon (dev) | Yes | Yes | Yes | No |
-| Ollama (external) | No | Optional | No | No |
+| `@shellcraft/ui` (Ink 8, React 19) | yes | yes | yes | yes |
+| ssh2 | yes | yes | yes | no |
+| dotenv | yes | yes | yes | no |
+| nanoid | yes | yes | yes | no |
+| nodemon (dev) | yes | yes | yes | no |
+| Ollama (external service) | no | optional | no | no |
+
+Each app depends on `"@shellcraft/ui": "file:../ui"` and has
+`install-links=true` in `.npmrc`.
 
 ## Session Management
 
 | Aspect | Demo Shop | Adventure Game | Admin Dashboard |
 |--------|-----------|----------------|-----------------|
-| Identity key | MD5 of SSH public key | SSH username | MD5 of SSH public key |
-| Storage | In-memory Map | `data/sessions.json` | In-memory Map |
-| Resume on reconnect | No (new session) | Yes (same username) | No (new session) |
-| Expiration | None | None | None |
-| Data stored | Cart contents | Game state, inventory, LLM history | -- |
+| Identity key | MD5 of the SSH public key | SSH user name | MD5 of the SSH public key |
+| Storage | in-memory Map | `data/sessions.json` | in-memory Map |
+| Resume on reconnect | no (new session) | yes (same user name) | no (new session) |
+| Expiration | none | none | none |
+| Data stored | cart, checkout fields, orders | game state, inventory, LLM history | -- |
+
+Apps made by `init.sh` store a SHA256 fingerprint in OpenSSH format
+(`SHA256:...`) and the SSH user name.
 
 ## Testing
 
 | Aspect | Demo Shop | Adventure Game | Admin Dashboard | Animation Demo |
 |--------|-----------|----------------|-----------------|----------------|
-| Unit tests | Yes | Yes | Yes | No |
-| E2E tests | Yes | Yes | Yes | No |
-| Test runner | Node.js built-in | Node.js built-in | Node.js built-in | N/A |
-| Watch mode | Yes | Yes | Yes | N/A |
+| Unit tests | yes | yes | yes | see note |
+| Screen tests (`@shellcraft/ui/testing`) | yes | yes | yes | see note |
+| E2E tests over SSH | yes | yes | yes | N/A |
+| Test runner | `node:test` | `node:test` | `node:test` | `node:test` |
+
+Note: animation-demo has no SSH server. Its tests come with its Ink port
+(`createFakeTty()` from the testing helpers drives `renderLocal()`).
 
 ## npm Scripts
 
 | Script | Demo Shop | Adventure Game | Admin Dashboard | Animation Demo |
 |--------|-----------|----------------|-----------------|----------------|
-| `start` | Yes | Yes | Yes | Yes |
-| `dev` | Yes | Yes | Yes | No |
-| `generate-keys` | Yes | Yes | Yes | No |
-| `restart` | No | Yes | No | No |
-| `test` | Yes | Yes | Yes | No |
-| `test:unit` | Yes | Yes | Yes | No |
-| `test:e2e` | Yes | Yes | Yes | No |
-| `test:watch` | Yes | Yes | Yes | No |
+| `start` | yes | yes | yes | yes |
+| `dev` | yes | yes | yes | no |
+| `generate-keys` | yes | yes | yes | no |
+| `restart` | no | yes | no | no |
+| `test` | yes | yes | yes | yes |
+| `test:unit` | yes | yes | yes | no |
+| `test:e2e` | yes | yes | yes | no |
+| `test:watch` | yes | yes | yes | no |
 
 ## Use Cases
 
-- **Demo Shop** -- E-commerce patterns: product catalog, shopping cart, checkout form, session-based state
-- **Adventure Game** -- LLM integration, file-based persistence, async loading screens, free-text input
-- **Admin Dashboard** -- Real-time system monitoring, OS data collection, multi-screen navigation
-- **Animation Demo** -- Terminal rendering techniques, frame-based ASCII animation
+- **Demo Shop**: e-commerce patterns: product table, cart, checkout form, session state
+- **Adventure Game**: LLM integration, file-based persistence, waiting states, free-text input
+- **Admin Dashboard**: live system monitoring, OS data, many screens
+- **Animation Demo**: frame-based ASCII animation in the local terminal

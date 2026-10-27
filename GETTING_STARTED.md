@@ -2,156 +2,135 @@
 
 ## Prerequisites
 
-- Node.js v18+ (`node --version`)
+- Node.js 22 or newer (`node --version`). Ink 8 needs it.
 - npm (`npm --version`)
-- SSH client (built-in on macOS/Linux; `ssh -V`)
+- An SSH client (`ssh -V`; built into macOS, Linux and Windows 10+)
 
-## Command Convention (Repo Demos)
+If `node` or `npm` is missing in your shell but you use nvm, run
+`source ~/.nvm/nvm.sh && nvm use default`. Inside this repository, the
+`./npmw` wrapper in each demo app does that for you.
 
-For demo apps inside this repository, use `./npmw ...` in each app directory.
-It auto-loads `nvm` if your shell does not expose `node`/`npm` on PATH.
-
-## Step 1: Make init.sh Executable
-
-```bash
-chmod +x init.sh
-```
-
-## Step 2: Generate a New App
+## Step 1: Generate a New App
 
 ```bash
-./init.sh my-app            # defaults to minimal template
-./init.sh my-app ecommerce  # e-commerce starter template
+./init.sh my-app            # minimal starter (the default)
+./init.sh my-app ecommerce  # products, cart and checkout
 ```
 
-The first argument is the project name, the second is the app type (`ecommerce` or `minimal`).
+The first argument is the directory to create, the second the app type. The
+script refuses to write into a directory that is not empty. `./init.sh --help`
+shows the usage.
 
-## Step 3: Install and Run
-
-If `npm` is not available in your shell, run:
-`source ~/.nvm/nvm.sh && nvm use default`
+## Step 2: Install and Test
 
 ```bash
 cd my-app
 npm install
-npm run generate-keys
-cp .env.example .env        # optional: edit port or other settings
+npm test
+```
+
+`npm test` runs the unit and screen tests, then starts the server on a free
+port and connects to it over SSH. It does not need a host key.
+
+## Step 3: Start the Server
+
+```bash
+npm run generate-keys       # creates keys/host_key
+cp .env.example .env        # optional: port and listen address
 npm start
 ```
 
 ## Step 4: Connect
 
-Open a new terminal window:
+In another terminal:
 
 ```bash
 ssh localhost -p 2222
 ```
 
-You should see a bordered terminal UI with a menu, header, and footer with navigation hints. Use arrow keys to navigate, Enter to select, `q` or Ctrl+C to quit.
+You should see:
+
+- a title bar on the first row: `My App › Home`
+- a menu panel with a cyan border on the left, details on the right
+- key hints on the last row: `↑↓ move  ⏎ open  1-2 jump  q quit`
+
+Arrow keys move, Enter opens, `b` goes back, `q` quits. Ctrl-C always quits.
 
 ---
 
 ## Trying the Demo Apps
 
-Each demo is a self-contained app inside the repo. They all follow the same setup pattern:
+Each demo is an app directory in this repository:
 
 ```bash
 cd <app-directory>
 ./npmw install
 ./npmw run generate-keys
-cp .env.example .env
+cp .env.example .env        # optional
 ./npmw start
-# then in another terminal: ssh localhost -p 2222
+# in another terminal: ssh localhost -p 2222
 ```
 
-### demo-shop
+`./quick-start.sh` does the same from a menu.
 
-E-commerce storefront. Browse products, add to cart, checkout. This is the same template that `./init.sh my-app` generates.
+| App | What it shows | Notes |
+|---|---|---|
+| `demo-shop` | products, cart, checkout form | the reference for `./init.sh my-app ecommerce` |
+| `adventure-game` | text RPG narrated by an LLM | needs [Ollama](https://ollama.com/) for narration; set `OLLAMA_BASE_URL` and `OLLAMA_MODEL` in `.env` |
+| `admin-dashboard` | live stats of the machine it runs on | reads the host OS |
+| `animation-demo` | ASCII animations | runs in your terminal, no SSH: `./npmw install && ./npmw start` |
 
-```bash
-cd demo-shop && ./npmw install && ./npmw run generate-keys && ./npmw start
-```
-
-### adventure-game
-
-Text adventure with LLM-powered dynamic descriptions. Requires Ollama running locally for LLM mode -- without it the game falls back to static room descriptions (fully playable, just not dynamic). Configure `OLLAMA_BASE_URL` and `OLLAMA_MODEL` in `.env`.
-
-```bash
-cd adventure-game && ./npmw install && ./npmw run generate-keys && ./npmw start
-```
-
-Keyboard shortcuts once connected: `h` = help/menu, `i` = inventory, `q` = quit, arrow keys to move between rooms.
-
-### admin-dashboard
-
-Server monitoring dashboard with system stats, process list, and log viewer.
-
-```bash
-cd admin-dashboard && ./npmw install && ./npmw run generate-keys && ./npmw start
-```
-
-### animation-demo
-
-Standalone ASCII animation showcase (runs directly in the terminal, no SSH):
-
-```bash
-cd animation-demo && ./npmw install && ./npmw start
-```
-
----
+Each screen lists its keys in the status bar. Each app's README has the details.
 
 ## Success Checks
 
-After connecting to any SSH app you should see:
+After you connect to any SSH app:
 
-- A bordered terminal interface with header and footer
-- A menu or interactive content area
-- Arrow key navigation works (up/down)
-- Enter selects menu items
-- `q` or Ctrl+C disconnects cleanly
+- The title bar is on the first row and the key hints are on the last row.
+- The UI fills the terminal; it does not scroll.
+- Arrow keys move the selection, Enter selects.
+- Resizing the terminal window redraws the screen at the new size.
+- `q` disconnects cleanly, and your terminal looks as it did before.
 
 ## Troubleshooting
 
-### Server won't start
+### The server does not start
 
-**EADDRINUSE** -- port 2222 is already in use:
-```bash
-lsof -ti:2222 | xargs kill
-```
+- **EADDRINUSE**: port 2222 is in use. Stop the other server
+  (`lsof -ti:2222 | xargs kill`) or set another `SSH_PORT` in `.env`.
+- **Cannot find module**: run `npm install` again.
+- **Host key not found**: run `npm run generate-keys`.
+- **Unsupported engine / syntax errors in ink**: update Node to 22 or newer.
 
-**Cannot find module 'ssh2'** -- run `npm install` again.
+### You cannot connect
 
-**Host key not found** -- run `npm run generate-keys`.
+- **Connection refused**: start the server, and check the port.
+- **Host key warning** after you generated a new key: remove the old entry
+  with `ssh-keygen -R "[localhost]:2222"`.
 
-### Can't connect
+### The screen looks wrong
 
-**Connection refused** -- make sure the server is running in another terminal.
+- **No colors**: unset `FORCE_COLOR=0` or `NO_COLOR` in the server's
+  environment.
+- **Broken lines or boxes**: use a terminal with Unicode support (iTerm2,
+  Terminal.app, GNOME Terminal, Windows Terminal, VS Code).
 
-**Screen is garbled** -- try a different terminal emulator (iTerm2, Hyper, Windows Terminal). Some terminals have limited color/unicode support.
-
-### Keys don't work
+### Keys do not work
 
 - Make sure the terminal window has focus.
-- If you're in a text input, press ESC first.
-- Use arrow keys, not mouse.
+- In a text field, `⏎` saves and `esc` cancels; `q` is just a letter there.
 
 ## Next Steps
 
-1. Read [QUICK_REFERENCE.md](./QUICK_REFERENCE.md) for the component and API cheat sheet.
-2. Modify the home screen or data models in whichever demo you're exploring.
-3. Create a new screen: add a file in `src/ui/`, register it in `src/server/router.js`, and link it from a menu.
-4. Check [USAGE_GUIDE.md](./USAGE_GUIDE.md) for deeper tutorials.
-
-### Code to explore
-
-- `src/server/index.js` -- SSH server setup
-- `src/ui/components.js` -- reusable UI component library
-- `src/ui/home.js` -- home screen implementation
-- `src/server/router.js` -- screen navigation and cleanup
+1. Read the code of the screens in `src/ui/`. Each one is short.
+2. Add a screen: [USAGE_GUIDE.md](USAGE_GUIDE.md#adding-a-screen).
+3. Keep [QUICK_REFERENCE.md](QUICK_REFERENCE.md) open while you code.
+4. Follow the screen rules in [DESIGN_PRINCIPLES.md](DESIGN_PRINCIPLES.md).
 
 ---
 
-**Quick start one-liner:**
+**One line:**
+
 ```bash
-./init.sh my-app && cd my-app && npm i && npm run generate-keys && npm start
+./init.sh my-app && cd my-app && npm i && npm test && npm run generate-keys && npm start
 ```

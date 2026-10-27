@@ -1,104 +1,99 @@
-# Terminal App Template Generator
+# shellcraft: SSH Terminal App Generator
 
-> Build SSH-accessible terminal applications with rich text user interfaces
+> Build terminal apps that people use over SSH
 
 ## What is This?
 
-A project generator and collection of demo applications for building SSH-based terminal apps with TUI (Text User Interface). It scaffolds a working Node.js project with an SSH server, screen-based navigation, session management, and reusable UI components -- all accessible via any standard SSH client.
+A project generator and four demo apps for SSH terminal apps in Node.js. An
+[ssh2](https://github.com/mscdex/ssh2) server runs one
+[Ink](https://github.com/vadimdemedes/ink) app (React for the terminal) per
+SSH session. Users connect with any SSH client; there is nothing to install
+on their side.
+
+The screens come from one shared package, [`@shellcraft/ui`](ui/README.md):
+title bar, status bar, panels, lists, tables, form fields, meters, a theme,
+test helpers, and `serve()`, which runs an Ink app on an SSH channel.
+
+```
+ Demo Shop › Home                                              cart: 3 · $69.97
+╭─ Menu ─────────────────────╮╭─ Cart ─────────────────────────────────────────╮
+│ › Browse products        1 ││                                                │
+│   View cart              2 ││ Developer Blend         2 × $24.99             │
+│   Checkout               3 ││ Terminal Espresso       1 × $19.99             │
+│                            ││                                                │
+│                            ││ Total                   $69.97                 │
+│                            ││                                                │
+╰────────────────────────────╯╰────────────────────────────────────────────────╯
+ ↑↓ move  ⏎ select  1-3 jump  q quit
+```
 
 ## Features
 
-- **SSH Server** -- anonymous or public key authentication
-- **TUI Framework** -- rich terminal UI powered by blessed (lists, tables, forms, buttons)
-- **Screen Router** -- declarative screen-to-screen navigation with automatic cleanup
-- **Session Management** -- per-connection state with optional persistence to disk
-- **Template Generator** -- `init.sh` scaffolds new projects with selectable app types
-- **4 Demo Apps** -- fully working examples covering different use cases
-- **Testing Suite** -- unit and E2E tests using Node.js built-in test runner
+- **SSH server**: anonymous or public key sign-in, one session per connection
+- **Ink UI**: screens built from `@shellcraft/ui` components, one design for all apps
+- **Works over SSH**: terminal size, resize, colors, CRLF, alternate screen and cleanup handled by `serve()`
+- **Generator**: `init.sh` creates a new app (`minimal` or `ecommerce`) with tests
+- **Four demo apps**: a shop, a text adventure with an LLM, a system dashboard, and animations
+- **Tests**: Node's built-in test runner; screen tests on a fake terminal, SSH tests against a real server
 
 ## Security Notice
 
-All demo apps accept anonymous SSH connections and are intended for **local development and demonstration only**. They are not hardened for production or public-facing deployment. If you expose a server to the internet, implement proper authentication, rate limiting, and access controls.
+All demo apps and generated apps accept anonymous SSH connections. They are
+for **local development and demos only**. Before you expose a server to a
+network, add real authentication, rate limiting and access control.
 
 ## Demo Apps
 
-### demo-shop -- E-commerce
+All four apps use Ink through `@shellcraft/ui`.
 
-A terminal-based storefront with product catalog, shopping cart, and checkout flow. Demonstrates forms, tables, and multi-screen workflows.
+### demo-shop: e-commerce
 
-### adventure-game -- Text RPG with LLM Integration
+A storefront: product table, cart, and a checkout form with validation. It is
+the reference app for the generator's `ecommerce` template.
 
-An interactive text adventure powered by a Game Master LLM via Ollama.
+### adventure-game: text RPG with an LLM
 
-<p align="center">
-  <img src="docs/images/adventure-menu.png" alt="Adventure Game Menu" width="600">
-</p>
+A text adventure narrated by a Game Master LLM through [Ollama](https://ollama.com/):
 
-<p align="center">
-  <img src="docs/images/adventure-game.png" alt="Adventure Game - Village Square" width="600">
-</p>
+- deterministic game rules; the LLM only narrates (`OLLAMA_MODEL` picks the model)
+- sessions saved to `data/sessions.json`, so players can reconnect and continue
+- free-text input to the Game Master next to suggested actions
+- a loading animation while the LLM answers
+- strict checks on the LLM's answers (invalid payloads fail fast)
 
-<p align="center">
-  <img src="docs/images/adventure-loading.png" alt="Wizard Loading Animation" width="300">
-</p>
+### admin-dashboard: system monitoring
 
-Features include:
+A dashboard for the machine it runs on: overview, processes, resources, logs,
+network, services and settings, refreshed live.
 
-- LLM-powered narrative generation (configurable model via `OLLAMA_MODEL`)
-- Session persistence across server restarts (saved to `data/sessions.json`)
-- Resume and continue support -- reconnect and pick up where you left off
-- Free-text input to the Game Master alongside suggested actions
-- Animated wizard loading screen while the LLM responds
-- Deterministic simulation + strict narration contract (fast-fail on invalid LLM payloads)
+### animation-demo: terminal animations
 
-### admin-dashboard -- System Monitoring
-
-A server monitoring dashboard with screens for system overview, running processes, resource usage, logs, network information, services, and settings.
-
-### animation-demo -- Terminal Animations
-
-A standalone ASCII animation showcase. Displays multiple frame-based animations with speed control, pause/play, and keyboard navigation. Useful as a reference for building loading screens and visual effects.
+ASCII animations with speed control and pause. It runs in your local terminal
+(no SSH) through `renderLocal()`. Useful as a reference for loading screens.
 
 ## Quick Start
 
-### Command Convention
-
-For apps that live inside this repository (`demo-shop`, `adventure-game`, `admin-dashboard`, `animation-demo`), use the local npm wrapper:
-
-```bash
-./npmw <command>
-```
-
-This wrapper auto-loads `nvm` if your shell PATH does not include `node`/`npm`.
-Plain `npm ...` commands still work when `node`/`npm` are already available in PATH.
+You need Node.js 22 or newer and an SSH client.
 
 ### Generate a New App
 
 ```bash
-chmod +x init.sh
-
-# Create a minimal starter app
-./init.sh my-app
-
-# Create an e-commerce app with full product/cart/checkout screens
-./init.sh my-app ecommerce
-
-# Explicitly request a minimal template
-./init.sh my-app minimal
+./init.sh my-app              # minimal starter (the default)
+./init.sh my-app ecommerce    # products, cart and checkout
 ```
-
-### Run a Generated App
-
-For generated apps, use plain `npm ...` commands (or load nvm first if `npm` is missing).
 
 ```bash
 cd my-app
 npm install
+npm test
 npm run generate-keys
 npm start
 ```
 
 ### Run a Demo App
+
+Inside this repository, use the `./npmw` wrapper in each app directory. It
+loads `nvm` when `node` or `npm` is not on your PATH.
 
 ```bash
 cd demo-shop          # or adventure-game, admin-dashboard
@@ -107,165 +102,118 @@ cd demo-shop          # or adventure-game, admin-dashboard
 ./npmw start
 ```
 
+`animation-demo` needs only `./npmw install` and `./npmw start`.
+`./quick-start.sh` offers all of this as a menu.
+
 ### Connect
 
 ```bash
 ssh localhost -p 2222
 ```
 
-Each app runs on port 2222 by default (configurable via `SSH_PORT` in `.env`).
+Each app listens on port 2222 (set `SSH_PORT` in `.env`). `q` quits, Ctrl-C
+always quits.
 
 ## Project Structure
 
 ```
 shellcraft/
-├── init.sh                  # Template generator script
-├── quick-start.sh           # One-liner setup helper
-├── ui/                      # @shellcraft/ui: shared Ink components + SSH adapter
-├── demo-shop/               # E-commerce demo app (Ink, uses ui/)
-├── adventure-game/          # Text RPG with LLM integration
-├── admin-dashboard/         # System monitoring dashboard
-├── animation-demo/          # ASCII animation showcase
-├── USAGE_GUIDE.md           # Detailed usage documentation
-├── QUICK_REFERENCE.md       # Quick reference for common tasks
-└── DESIGN_PRINCIPLES.md     # Design principles for SSH/blessed apps
+├── init.sh                  # app generator
+├── quick-start.sh           # menu: run a demo, run tests, create an app
+├── ui/                      # @shellcraft/ui: Ink components, theme, serve(), test helpers
+├── demo-shop/               # e-commerce demo
+├── adventure-game/          # text RPG with an LLM
+├── admin-dashboard/         # system monitoring dashboard
+├── animation-demo/          # ASCII animations (local terminal)
+└── *.md                     # documentation (see INDEX.md)
 ```
+
+The demo apps depend on `"@shellcraft/ui": "file:../ui"`. Their `.npmrc`
+sets `install-links=true`, so npm copies `ui/` into each app's
+`node_modules` (one React). After you change `ui/`, run `./npmw ci` in the app.
 
 ### Generated App Structure
 
 ```
 my-app/
 ├── src/
+│   ├── config.js            # app name for the title bar
 │   ├── server/
-│   │   ├── index.js         # SSH server entry point
-│   │   ├── router.js        # Screen navigation router
-│   │   └── session.js       # Session management
+│   │   ├── index.js         # SSH server
+│   │   ├── auth.js          # who gets in: a verified key, or anonymous
+│   │   ├── router.js        # passes each shell to serve()
+│   │   └── session.js       # one session per connection
 │   ├── ui/
-│   │   ├── components.js    # Reusable UI components
-│   │   ├── home.js          # Home screen
-│   │   └── ...              # Additional screens
-│   └── models/              # Data models
+│   │   ├── app.js           # current screen, status message, ctx
+│   │   └── *.js             # one file per screen
+│   └── models/              # data (ecommerce)
 ├── test/
-│   ├── unit/                # Unit tests
-│   ├── e2e/                 # End-to-end tests
-│   └── helpers/             # Test utilities
-├── keys/                    # SSH host keys (generated, gitignored)
-├── scripts/
-│   └── generate-keys.js     # RSA key pair generator
-├── package.json
-├── .env.example
-└── .gitignore
+│   ├── unit/                # sessions, screens, SSH adapter
+│   ├── e2e/                 # the real SSH server
+│   └── helpers/
+├── vendor/ui/               # copy of @shellcraft/ui
+├── scripts/generate-keys.js # SSH host key
+├── keys/                    # host key (generated, git-ignored)
+└── package.json, .npmrc, .env.example
 ```
+
+A generated app is self-contained: it depends on
+`"@shellcraft/ui": "file:./vendor/ui"`, so it does not need this repository.
 
 ## Technology Stack
 
-- **[ssh2](https://github.com/mscdex/ssh2)** -- SSH server implementation
-- **[Ink](https://github.com/vadimdemedes/ink)** -- React for the terminal, through the shared [`ui/`](ui/README.md) package (demo-shop; the other apps are being moved over)
-- **[blessed](https://github.com/chjj/blessed)** -- Terminal UI framework (admin-dashboard, adventure-game, animation-demo, generated apps)
-- **[dotenv](https://github.com/motdotla/dotenv)** -- Environment configuration
-- **[nanoid](https://github.com/ai/nanoid)** -- Unique ID generation
+- **[ssh2](https://github.com/mscdex/ssh2)**: SSH server
+- **[Ink](https://github.com/vadimdemedes/ink) 8 and React 19**: the UI, through [`@shellcraft/ui`](ui/README.md)
+- **[dotenv](https://github.com/motdotla/dotenv)**: configuration from `.env`
+- **[nanoid](https://github.com/ai/nanoid)**: session ids
+- **Node's test runner** (`node:test`): all tests
 
-The adventure-game additionally uses **Ollama** for local LLM inference (not bundled as an npm dependency; runs as a separate service).
+adventure-game also talks to **Ollama** over HTTP for local LLM answers. Ollama
+runs as a separate service and is not an npm dependency.
 
-## Creating a Custom Screen
+## Creating a Screen
 
-```javascript
-// src/ui/myscreen.js
-import { UIComponents } from './components.js';
+A screen is a function component. It gets `ctx` from `src/ui/app.js`:
 
-export class MyScreen {
-  constructor(context) {
-    this.context = context;
-    this.screen = context.screen;
-    this.render();
-  }
+```js
+import React from 'react';
+import { Screen, Panel, Text, useInput } from '@shellcraft/ui';
 
-  render() {
-    const menu = UIComponents.createList({
-      parent: this.screen,
-      top: 'center',
-      left: 'center',
-      width: '50%',
-      height: 10,
-      label: ' My Menu ',
-      items: ['Option 1', 'Option 2', 'Option 3']
-    });
+const h = React.createElement;
 
-    menu.on('select', (item, index) => {
-      UIComponents.showMessage(
-        this.screen,
-        `Selected: ${item}`,
-        'success'
-      );
-    });
+export function HelloScreen({ ctx }) {
+  useInput((input, key) => {
+    if (input === 'b' || key.escape) ctx.navigate('home');
+  });
 
-    this.screen.key(['escape'], () => {
-      this.context.navigate('home');
-    });
-  }
+  return h(
+    Screen,
+    { app: 'My App', screen: 'Hello', hints: [['b', 'back'], ['q', 'quit']], message: ctx.message },
+    h(Panel, { title: 'Hello', focused: true }, h(Text, null, 'Hello from Ink.'))
+  );
 }
 ```
 
-Register the screen in `src/server/router.js`:
+Add it to `screens` in `src/ui/app.js` and open it with `ctx.navigate('hello')`.
+[USAGE_GUIDE.md](USAGE_GUIDE.md) shows menus, tables, forms and messages.
 
-```javascript
-import { MyScreen } from '../ui/myscreen.js';
+## Design Rules
 
-this.screens = {
-  home: HomeScreen,
-  myscreen: MyScreen,
-  // ...
-};
-```
-
-## Customization
-
-- **Screens** -- Add or modify screens in `src/ui/`
-- **Models** -- Update data models in `src/models/`
-- **Styling** -- Blessed supports 256 colors and multiple border types
-- **Authentication** -- Customize in `src/server/index.js`
-- **Session Data** -- Extend the session object in `src/server/session.js`
-
-## Deployment
-
-### Local Development
-
-```bash
-./npmw run dev  # Uses nodemon for auto-reload
-```
-
-### Production (PM2)
-
-```bash
-pm2 start src/server/index.js --name my-app
-pm2 startup
-pm2 save
-```
-
-### Docker
-
-```bash
-docker build -t my-app .
-docker run -p 2222:2222 my-app
-```
+One title bar and one status bar per screen. Key hints read `q quit`. Colors
+only through the theme helpers. No floating boxes: results go to the status
+bar. No Exit menu items. The full rules, and why Ink needs care over SSH, are
+in [DESIGN_PRINCIPLES.md](DESIGN_PRINCIPLES.md). The visual reference is the
+[Figma file](https://www.figma.com/design/oykSSRdp0xDbaot7ZkLFQc).
 
 ## Documentation
 
-- **[USAGE_GUIDE.md](./USAGE_GUIDE.md)** -- Complete guide with examples and tutorials
-- **[QUICK_REFERENCE.md](./QUICK_REFERENCE.md)** -- Quick reference for common tasks
-- **[DESIGN_PRINCIPLES.md](./DESIGN_PRINCIPLES.md)** -- Design principles for SSH/blessed apps
-
-## One-Liner Setup
-
-```bash
-./init.sh my-app && cd my-app && npm i && npm run generate-keys && npm start
-```
-
-Then connect: `ssh localhost -p 2222`
-
-If `npm` is not found in your shell, load nvm first:
-`source ~/.nvm/nvm.sh && nvm use default`.
+- **[GETTING_STARTED.md](GETTING_STARTED.md)**: step by step, with troubleshooting
+- **[USAGE_GUIDE.md](USAGE_GUIDE.md)**: build and change screens, sessions, APIs, LLMs, deployment
+- **[QUICK_REFERENCE.md](QUICK_REFERENCE.md)**: commands and component cheat sheet
+- **[DESIGN_PRINCIPLES.md](DESIGN_PRINCIPLES.md)**: screen rules and Ink over SSH
+- **[ui/README.md](ui/README.md)**: every component, the theme, `serve()` and the test helpers
+- **[INDEX.md](INDEX.md)**: all documents
 
 ## License
 
-MIT License -- free to use for any project, commercial or personal.
+MIT License: free to use for any project, commercial or personal.

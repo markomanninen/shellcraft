@@ -1,185 +1,74 @@
-# Complete Project Overview
+# Complete Overview
 
-A template system for building SSH-based terminal applications, with **4 demo applications** and a comprehensive test suite.
+shellcraft has four parts. This page says what each part is for and what you
+can learn from it. To get started, read [README.md](README.md). For the file
+layout, see [PROJECT_SUMMARY.md](PROJECT_SUMMARY.md). All documents are
+listed in [INDEX.md](INDEX.md).
 
----
+## 1. The ui Package
 
-## What This Project Contains
+[`ui/`](ui/README.md) is `@shellcraft/ui`: Ink components, the theme, the SSH
+adapter `serve()`, `renderLocal()` for the local terminal, and test helpers.
+Every app uses it, so every app looks and behaves the same.
 
-### 1. Template Generator (`init.sh`)
+You can learn:
 
-A single bash script (~1,633 lines) that generates a complete terminal app with:
-- SSH server (ssh2)
-- Terminal UI (blessed)
-- Session management
-- Screen navigation and routing
-- Reusable UI component library
-- Test suite (unit + e2e)
-- Configuration and documentation
+- how to run an Ink app over SSH (size, CRLF, colors, resize, cleanup)
+- how to keep colors readable on any terminal theme (16 ANSI colors, dim for muted text)
+- how to test a terminal UI: render on a fake terminal, press keys, check rows and styles
 
-### 2. Demo Applications
+## 2. The Generator
 
-#### Demo Shop (`/demo-shop/`)
-E-commerce terminal app with product catalog, shopping cart, checkout form, and session-based shopping.
-
-```bash
-cd demo-shop && ./npmw install && ./npmw run generate-keys && ./npmw start
-# Then: ssh localhost -p 2222
-```
-
-#### Adventure Game (`/adventure-game/`)
-Text-based dungeon crawler with LLM integration via Ollama. Features include:
-- 6 interconnected rooms with item collection
-- LLM-powered game engine for dynamic narrative responses
-- Wizard loading animation during LLM calls
-- Username-based session persistence (JSON files on disk)
-- Resume support -- reconnecting SSH users continue where they left off
+`init.sh` creates a new SSH app that uses Ink through a copy of the ui
+package (`vendor/ui`):
 
 ```bash
-cd adventure-game && ./npmw install && ./npmw run generate-keys && ./npmw start
-# Then: ssh localhost -p 2222
+./init.sh my-app            # minimal: menu, scrolling text, session table
+./init.sh my-app ecommerce  # products, cart, checkout form
 ```
 
-#### Admin Dashboard (`/admin-dashboard/`)
-Real-time system monitoring dashboard showing CPU, memory, process list, system logs, network info, and services. Reads live data from the host OS.
+The new app comes with unit, screen, SSH adapter and e2e tests, and it does
+not need this repository.
 
-```bash
-cd admin-dashboard && ./npmw install && ./npmw run generate-keys && ./npmw start
-# Then: ssh localhost -p 2222
-```
+## 3. The Demo Apps
 
-#### Animation Demo (`/animation-demo/`)
-Standalone blessed terminal animation viewer. Displays various ASCII art animations directly in the terminal without an SSH server.
+### Demo Shop (`demo-shop/`)
 
-```bash
-cd animation-demo && ./npmw install && ./npmw start
-```
+- multi-screen flow: menu, table, cart, form
+- form editing and validation, errors under fields and in the status bar
+- per-session state (the cart) with fingerprint-based sessions in memory
+- the reference structure for the other apps and for the generator
 
-### 3. Testing Infrastructure
+### Adventure Game (`adventure-game/`)
 
-Each SSH-based app (demo-shop, adventure-game, admin-dashboard) includes:
+- LLM integration: an Ollama client and a game engine that only narrates
+- deterministic game rules, quests, combat and skill checks in config
+- waiting states: a loading animation while the LLM answers
+- sessions keyed by SSH user name and saved to disk, so players can resume
 
-```
-test/
-  unit/           # Unit tests (models, sessions, LLM engine)
-  e2e/            # End-to-end tests (SSH connections, workflows)
-  helpers/        # Shared test utilities
-```
+### Admin Dashboard (`admin-dashboard/`)
 
-```bash
-./npmw test            # Run all tests
-./npmw run test:unit   # Unit tests only
-./npmw run test:e2e    # E2E tests only
-./npmw run test:watch  # Watch mode
-```
+- live data from the host OS: CPU, memory, processes, logs, network, services
+- periodic refresh that stops when the user leaves
+- meters, tables and many screens with one navigation pattern
 
-Tests cover: data models, session creation and isolation, SSH server connections, user workflows, LLM engine logic, and cart/inventory operations.
+### Animation Demo (`animation-demo/`)
 
-### 4. Documentation
+- frame-based ASCII animation
+- a full-screen Ink app in the local terminal with `renderLocal()`, no SSH
 
-| File | Description |
-|------|-------------|
-| [README.md](README.md) | Project overview and quick start |
-| [COMPLETE_OVERVIEW.md](COMPLETE_OVERVIEW.md) | This file -- full project summary |
-| [PROJECT_SUMMARY.md](PROJECT_SUMMARY.md) | File tree and technical details |
-| [USAGE_GUIDE.md](USAGE_GUIDE.md) | Tutorials and customization guide |
-| [QUICK_REFERENCE.md](QUICK_REFERENCE.md) | Command and API cheat sheet |
-| [VISUAL_DEMO.md](VISUAL_DEMO.md) | ASCII mockups of all screens |
-| [GETTING_STARTED.md](GETTING_STARTED.md) | Step-by-step setup checklist |
-| [TESTING_SUMMARY.md](TESTING_SUMMARY.md) | Test coverage details |
-| [INDEX.md](INDEX.md) | Documentation navigation guide |
-| [COMPARISON.md](COMPARISON.md) | Feature comparison across apps |
-| [DESIGN_PRINCIPLES.md](DESIGN_PRINCIPLES.md) | Architecture and design decisions |
+## 4. The Tests
 
-Each app also has its own `README.md`.
+- unit tests for models, sessions and game logic
+- screen tests with `renderTerminal()` at 80×24 and 100×30
+- SSH adapter tests with a fake channel
+- e2e tests against the real server with an ssh2 client
 
----
+Details: [TESTING_SUMMARY.md](TESTING_SUMMARY.md).
 
-## Quick Start
+## Use Cases Shown
 
-### Generate a new app from the template
-
-If `npm` is not available in your shell, run:
-`source ~/.nvm/nvm.sh && nvm use default`
-
-```bash
-chmod +x init.sh
-./init.sh my-app-name
-cd my-app-name
-npm install
-npm run generate-keys
-npm test
-npm start
-# In another terminal: ssh localhost -p 2222
-```
-
-### Try an existing demo
-```bash
-cd demo-shop && ./npmw install && ./npmw run generate-keys && ./npmw test && ./npmw start
-```
-
----
-
-## What You Can Learn
-
-### From Demo Shop
-- E-commerce workflows in a terminal UI
-- Session-based shopping cart management
-- Form handling and input validation
-- Fingerprint-based in-memory session management
-
-### From Adventure Game
-- LLM integration patterns (Ollama client, game engine)
-- Async loading screens (wizard animation during API calls)
-- File-based session persistence (JSON on disk)
-- SSH username-based authentication and session resumption
-- Stateful game logic with room navigation and inventory
-
-### From Admin Dashboard
-- Real-time system monitoring with OS integration
-- Data refreshing and live updates
-- Fingerprint-based in-memory session management
-- Multi-screen dashboard layout
-
-### From Animation Demo
-- Blessed terminal rendering without SSH
-- Frame-based animation techniques in the terminal
-
-### From the Test Suites
-- Unit testing patterns for Node.js models
-- E2E testing of SSH server connections
-- Test isolation and session management testing
-- Mocking strategies for LLM and OS calls
-
----
-
-## Technology Stack
-
-- **ssh2** -- SSH server implementation
-- **blessed** -- Terminal UI framework
-- **dotenv** -- Environment configuration
-- **nanoid** -- ID generation
-- **nodemon** -- Development auto-reload
-- **Ollama** -- Local LLM integration (adventure-game)
-- **Node.js built-in test runner** -- Unit and e2e tests
-
----
-
-## Use Cases Demonstrated
-
-- **E-commerce**: Product catalogs, shopping carts, checkout flows
-- **Gaming**: Room navigation, inventory, LLM-driven narrative, session persistence
-- **System Administration**: Real-time monitoring, process lists, log viewing
-- **Animation**: Terminal-based visual effects and ASCII art
-
----
-
-## Documentation Index
-
-- **[README.md](README.md)** -- Start here
-- **[GETTING_STARTED.md](GETTING_STARTED.md)** -- Step-by-step setup
-- **[USAGE_GUIDE.md](USAGE_GUIDE.md)** -- Customization and tutorials
-- **[QUICK_REFERENCE.md](QUICK_REFERENCE.md)** -- Cheat sheet
-- **[TESTING_SUMMARY.md](TESTING_SUMMARY.md)** -- Test coverage
-- **[PROJECT_SUMMARY.md](PROJECT_SUMMARY.md)** -- Technical file tree
-- **[VISUAL_DEMO.md](VISUAL_DEMO.md)** -- Screen mockups
+- **E-commerce**: product tables, carts, checkout forms
+- **Games**: rooms, inventory, LLM narration, saved sessions
+- **System administration**: live monitoring, process lists, logs
+- **Animation**: loading screens and visual effects in the terminal

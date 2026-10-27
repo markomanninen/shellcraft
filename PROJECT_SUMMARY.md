@@ -1,226 +1,134 @@
-# Terminal App Template - Project Summary
+# Project Summary
 
-## Overview
+The technical layout of the repository: which file does what. For what the
+project is and how to start, see [README.md](README.md). All documents are
+listed in [INDEX.md](INDEX.md).
 
-A template generator and collection of demo applications for building SSH-based terminal UIs with Node.js.
-
-## File Structure
+## Repository
 
 ```
-terminal_example/
-├── init.sh                        # Template generator script (~1,633 lines)
-├── quick-start.sh                 # Quick setup helper script
-├── README.md                      # Project overview
-├── COMPLETE_OVERVIEW.md           # Full project overview
-├── PROJECT_SUMMARY.md             # This file -- technical details
-├── USAGE_GUIDE.md                 # Tutorials and customization
-├── QUICK_REFERENCE.md             # Command and API cheat sheet
-├── VISUAL_DEMO.md                 # ASCII screen mockups
-├── GETTING_STARTED.md             # Step-by-step setup checklist
-├── TESTING_SUMMARY.md             # Test coverage details
-├── INDEX.md                       # Documentation navigation
-├── COMPARISON.md                  # Feature comparison across apps
-├── DESIGN_PRINCIPLES.md           # Architecture decisions
-│
-├── demo-shop/                     # E-commerce demo app
-│   ├── package.json
-│   ├── .env.example
-│   ├── .gitignore
-│   ├── README.md
-│   ├── scripts/
-│   │   └── generate-keys.js       # SSH key generator
-│   ├── src/
-│   │   ├── server/
-│   │   │   ├── index.js           # SSH server entry point
-│   │   │   ├── router.js          # Screen routing
-│   │   │   └── session.js         # Session management (fingerprint-based, in-memory)
-│   │   ├── ui/
-│   │   │   ├── components.js      # Reusable UI component library
-│   │   │   ├── home.js            # Home screen
-│   │   │   ├── products.js        # Product listing screen
-│   │   │   ├── cart.js            # Shopping cart screen
-│   │   │   └── checkout.js        # Checkout form screen
-│   │   └── models/
-│   │       └── product.js         # Product data model
-│   └── test/
-│       ├── unit/
-│       │   ├── product.test.js    # Product model tests
-│       │   └── session.test.js    # Session manager tests
-│       ├── e2e/
-│       │   ├── server.test.js     # SSH server connection tests
-│       │   └── workflow.test.js   # User workflow tests
-│       └── helpers/
-│           └── test-utils.js      # Shared test utilities
-│
-├── adventure-game/                # Text adventure with LLM integration
-│   ├── package.json
-│   ├── .env.example
-│   ├── .gitignore
-│   ├── README.md
-│   ├── scripts/
-│   │   └── generate-keys.js       # SSH key generator
-│   ├── src/
-│   │   ├── server/
-│   │   │   ├── index.js           # SSH server entry point
-│   │   │   ├── router.js          # Screen routing
-│   │   │   └── session.js         # Session management (username-based, JSON persistence)
-│   │   ├── llm/
-│   │   │   ├── ollama-client.js   # Ollama API client
-│   │   │   └── game-engine.js     # LLM-powered game engine
-│   │   ├── ui/
-│   │   │   ├── components.js      # Reusable UI component library
-│   │   │   ├── game.js            # Main game screen
-│   │   │   ├── room.js            # Room display and interaction
-│   │   │   ├── inventory.js       # Inventory screen
-│   │   │   ├── help.js            # Help screen
-│   │   │   ├── stats.js           # Player stats screen
-│   │   │   └── loading-animation.js  # Wizard loading animation for LLM calls
-│   │   ├── models/
-│   │   │   └── game.js            # Game state and room data
-│   │   ├── middleware/            # (placeholder)
-│   │   ├── routes/                # (placeholder)
-│   │   └── utils/                 # (placeholder)
-│   └── test/
-│       ├── unit/
-│       │   ├── game.test.js           # Game model tests
-│       │   ├── session.test.js        # Session manager tests
-│       │   ├── llm-engine.test.js     # LLM game engine tests
-│       │   └── ollama-client.test.js  # Ollama client tests
-│       ├── e2e/
-│       │   ├── server.test.js     # SSH server connection tests
-│       │   └── workflow.test.js   # Game workflow tests
-│       └── helpers/
-│           └── test-utils.js      # Shared test utilities
-│
-├── admin-dashboard/               # System monitoring dashboard
-│   ├── package.json
-│   ├── .env.example
-│   ├── .gitignore
-│   ├── README.md
-│   ├── scripts/
-│   │   └── generate-keys.js       # SSH key generator
-│   ├── src/
-│   │   ├── server/
-│   │   │   ├── index.js           # SSH server entry point
-│   │   │   ├── router.js          # Screen routing
-│   │   │   └── session.js         # Session management (fingerprint-based, in-memory)
-│   │   ├── ui/
-│   │   │   ├── components.js      # Reusable UI component library
-│   │   │   ├── dashboard.js       # Main dashboard screen
-│   │   │   ├── overview.js        # System overview screen
-│   │   │   ├── processes.js       # Process monitor screen
-│   │   │   ├── resources.js       # Resource usage screen
-│   │   │   ├── logs.js            # System logs screen
-│   │   │   ├── network.js         # Network info screen
-│   │   │   ├── services.js        # Services screen
-│   │   │   └── settings.js        # Settings screen
-│   │   └── models/
-│   │       └── system.js          # System data model (OS stats)
-│   └── test/
-│       ├── unit/
-│       │   ├── system.test.js     # System model tests
-│       │   └── session.test.js    # Session manager tests
-│       ├── e2e/
-│       │   ├── server.test.js     # SSH server connection tests
-│       │   └── workflow.test.js   # Dashboard workflow tests
-│       └── helpers/
-│           └── test-utils.js      # Shared test utilities
-│
-└── animation-demo/                # Standalone terminal animation viewer
-    ├── package.json
-    ├── .gitignore
-    ├── README.md
-    ├── index.js                   # Entry point and animation runner
-    └── animations.js              # Animation frame definitions
+shellcraft/
+├── init.sh                    # app generator (bash; macOS and Linux)
+├── quick-start.sh             # menu: run a demo, run tests, create an app
+├── ui/                        # @shellcraft/ui, shared by every app
+├── demo-shop/                 # e-commerce demo (reference app)
+├── adventure-game/            # text RPG with an LLM
+├── admin-dashboard/           # system monitoring dashboard
+├── animation-demo/            # ASCII animations in the local terminal
+├── docs/images/               # images for the docs
+├── scripts/                   # maintenance scripts (CI failures, dependabot PRs)
+├── .github/                   # CI (tests, CodeQL, dependency scan), templates
+└── *.md                       # documentation
 ```
 
-## Template Generator (`init.sh`)
+## ui/ (@shellcraft/ui)
 
-The generator script is ~1,633 lines of bash. Running `./init.sh <app-name>` produces a complete SSH terminal app with server, UI, models, tests, configuration, and documentation.
+Plain ESM JavaScript, no build step. Ink and React are peer dependencies:
+each app provides them, so there is one React.
 
-### Usage
-```bash
-chmod +x init.sh
-./init.sh my-app-name
-cd my-app-name
-npm install
-npm run generate-keys
-npm test
-npm start
-# In another terminal: ssh localhost -p 2222
+```
+ui/
+├── src/
+│   ├── index.js               # everything apps import (also Ink's Box, Text, useInput, useApp)
+│   ├── theme.js               # the only place colors are named; textProps(), borderProps()
+│   ├── color.js               # pins Ink's chalk to the 16 ANSI colors
+│   ├── ssh.js                 # serve(): an Ink app on an ssh2 channel
+│   ├── local.js               # renderLocal(): full screen in the local terminal
+│   ├── fullscreen.js          # alternate screen, resize, exit (shared by both)
+│   ├── size.js                # useTerminalSize(), useScreenSize()
+│   ├── hooks.js               # useInterval()
+│   ├── selection.js, text.js  # list selection and scrolling, text wrapping
+│   ├── testing.js             # @shellcraft/ui/testing: renderTerminal(), styleAt(), fake SSH channel, fake TTY
+│   └── components/            # Screen, TitleBar, StatusBar, KeyHint, Message, Panel, SelectList,
+│                              # Table, TextField, Button, Meter, EmptyState, ScrollView
+├── test/                      # components, screen, scroll, ssh, local
+├── scripts/contrast.mjs       # WCAG contrast of the muted color in common terminal themes
+└── README.md                  # components, theme, serve(), test helpers
 ```
 
-## Session Management
+## demo-shop/ (the reference app)
 
-The project demonstrates two different session strategies:
+The other SSH apps and every generated app follow this structure.
 
-**Fingerprint-based, in-memory (demo-shop, admin-dashboard):**
-Sessions are identified by a hash of the client's SSH public key. State is held in memory and lost on server restart.
+```
+demo-shop/
+├── package.json               # "@shellcraft/ui": "file:../ui", ink, react, ssh2, dotenv, nanoid
+├── .npmrc                     # install-links=true: npm copies ui/ into node_modules
+├── npmw                       # npm wrapper that loads nvm if needed
+├── .env.example
+├── scripts/
+│   ├── generate-keys.js       # SSH host key (keys/host_key)
+│   └── with-node.sh           # used by npmw
+├── src/
+│   ├── server/
+│   │   ├── index.js           # ssh2 server: authentication, sessions, pty and shell requests
+│   │   ├── router.js          # serve(stream, ptyInfo, h(ShopApp, { session }), { session })
+│   │   └── session.js         # SessionManager (fingerprint, cart, in memory)
+│   ├── ui/
+│   │   ├── app.js             # ShopApp: current screen, status message, ctx
+│   │   ├── home.js            # menu + cart summary
+│   │   ├── products.js        # products table
+│   │   ├── cart.js            # cart table with total
+│   │   ├── checkout.js        # form and validation
+│   │   └── cart-summary.js    # cart helpers and the summary block
+│   └── models/
+│       └── product.js
+├── test/
+│   ├── unit/                  # product, session, screens, ssh-adapter
+│   ├── e2e/                   # server (real SSH), workflow
+│   └── helpers/test-utils.js
+└── test-ssh-minimal.js        # manual check: a bare ssh2 server without Ink
+```
 
-**Username-based, file-persisted (adventure-game):**
-Sessions are keyed by the SSH username. Game state is saved to JSON files on disk, allowing players to disconnect and resume later by reconnecting with the same username.
+## The Other Apps
 
-## Technology Stack
+| App | Specific parts | Details |
+|---|---|---|
+| adventure-game | `src/config/` (game world and runtime settings), `src/llm/` (Ollama client, game engine), `src/models/`, sessions saved in `data/sessions.json` | [adventure-game/README.md](adventure-game/README.md) |
+| admin-dashboard | `src/models/system.js` (OS stats, process list), one screen per view in `src/ui/` | [admin-dashboard/README.md](admin-dashboard/README.md) |
+| animation-demo | `index.js` (starts `renderLocal()`), `animations.js` (frames); no server | [animation-demo/README.md](animation-demo/README.md) |
+
+## Generated Apps
+
+`./init.sh <name> [minimal|ecommerce]` writes the demo-shop structure, plus:
+
+- `vendor/ui/`: a copy of `ui/src`, `README.md`, `package.json` (without
+  devDependencies) and the license. The app depends on
+  `"@shellcraft/ui": "file:./vendor/ui"`, so it does not need this repository.
+- `src/config.js`: the app name for the title bar, from the directory name.
+- `src/server/auth.js`: lets a client in with a verified key (its
+  fingerprint goes on the session) or anonymously through
+  keyboard-interactive; rejects the `none` method.
+- `test/helpers/server.js`: starts the server on a free port with a
+  throwaway host key for the e2e tests.
+
+| Type | Screens |
+|---|---|
+| `minimal` | Home (menu + detail), Getting started (scrolling text), Session (table) |
+| `ecommerce` | Home, Products, Cart, Checkout: the demo-shop screens |
+
+## Sessions
+
+Two strategies:
+
+- **Fingerprint, in memory** (demo-shop, admin-dashboard, generated apps):
+  the session is identified by a hash of the client's SSH public key, or
+  `anonymous`. It ends with the connection.
+- **User name, on disk** (adventure-game): the session is keyed by the SSH
+  user name and saved to JSON, so a player can reconnect and continue.
+
+## Dependencies
 
 | Dependency | Purpose |
 |-----------|---------|
-| ssh2 | SSH server implementation |
-| blessed | Terminal UI framework |
-| dotenv | Environment configuration |
-| nanoid | ID generation |
-| nodemon | Development auto-reload |
+| ink, react | the UI (through `@shellcraft/ui`) |
+| ssh2 | SSH server |
+| dotenv | settings from `.env` |
+| nanoid | session ids |
+| nodemon (dev) | restart on changes |
+| @xterm/headless, ink-testing-library (ui, dev) | ui tests |
 
-The adventure-game additionally integrates with **Ollama** for local LLM inference (no extra npm dependency; uses HTTP requests).
-
-## Testing
-
-Each SSH-based app includes unit and e2e tests using the Node.js built-in test runner.
-
-```bash
-npm test            # All tests
-npm run test:unit   # Unit tests only
-npm run test:e2e    # E2E tests only
-npm run test:watch  # Watch mode
-```
-
-**demo-shop tests:** product model, session management, server connections, shopping workflow.
-**adventure-game tests:** game model, session persistence, LLM engine logic, Ollama client, server connections, game workflow.
-**admin-dashboard tests:** system model, session management, server connections, dashboard workflow.
-
-## Documentation
-
-The project includes 11 markdown files at the root level, plus a README in each app directory:
-
-| File | Description |
-|------|-------------|
-| README.md | Project overview and quick start |
-| COMPLETE_OVERVIEW.md | Full project overview |
-| PROJECT_SUMMARY.md | File tree and technical details |
-| USAGE_GUIDE.md | Tutorials, customization, API integration |
-| QUICK_REFERENCE.md | Command and component cheat sheet |
-| VISUAL_DEMO.md | ASCII screen mockups |
-| GETTING_STARTED.md | Step-by-step setup checklist |
-| TESTING_SUMMARY.md | Test coverage details |
-| INDEX.md | Documentation navigation guide |
-| COMPARISON.md | Feature comparison across apps |
-| DESIGN_PRINCIPLES.md | Architecture and design decisions |
-
-## Deployment
-
-### Development
-```bash
-npm run dev  # Auto-reload with nodemon
-```
-
-### Production
-```bash
-# PM2
-pm2 start src/server/index.js
-
-# Docker
-docker build -t my-terminal-app .
-docker run -p 2222:2222 my-terminal-app
-```
+adventure-game also calls Ollama over HTTP (no npm dependency).
 
 ## License
 
