@@ -1,0 +1,15 @@
+[
+ {"where": "Overlapping panels", "what": "admin overview: Memory Usage is drawn over the bottom of System Information and Load Average (worse at 80 × 24). admin resources at 80 × 24: Memory Details runs off the bottom edge."},
+ {"where": "Back button over content", "what": "admin logs, network, resources and settings: the floating Back button covers table rows or panel text."},
+ {"where": "Wrapping and clipping", "what": "adventure room: HP and Tension bars wrap and the value lands in column 0; wrapped description lines lose the first line's indent; Outcome and Objective are cut at 80 × 24. admin processes: ps lines wrap at 80 × 24."},
+ {"where": "Labels cut by table rules", "what": "admin network: the panel label reads 'Network In│erfaces' because a column rule crosses it."},
+ {"where": "Title colors carry no meaning", "what": "every screen header has its own color (cyan, green, blue, red, yellow, magenta); the red PROCESSES title reads like an error."},
+ {"where": "Border colors", "what": "panel borders are picked per panel (cyan, yellow, magenta, green, red); the same role gets a different color on each screen and app."},
+ {"where": "Empty states look like errors", "what": "adventure journal and stats put 'no game yet' in a red box; inventory uses yellow text in an empty box."},
+ {"where": "Key-hint footer", "what": "on every adventure screen, only on the first admin screen, borderless in demo-shop; four syntaxes: 'q to quit', 'q=quit', '[B] Back', 'Enter: edit/submit'."},
+ {"where": "Selection and focus", "what": "blue bar in menus, white inverse bar in the demo-shop table, blue fill for the focused input, a colored block as the action list's scrollbar."},
+ {"where": "Buttons", "what": "admin Back is blue with a yellow border, demo-shop SUBMIT ORDER is solid green; there is no shared button."},
+ {"where": "Tables", "what": "header rows yellow bold in some tables and plain in others; cell padding 0 in admin tables and the cart, 1 in products; column rules in some tables only, drawn down to the panel bottom."},
+ {"where": "Loading screen", "what": "no header or footer, unlike every other screen."},
+ {"where": "No theme", "what": "about 130 hard-coded ANSI color names across three diverged copies of components.js and the screens; the result depends on each user's terminal theme."}
+]
