@@ -1,124 +1,95 @@
-import { UIComponents } from './components.js';
+import React from 'react';
+import { Screen, Panel, ScrollView, Box, Text, useTerminalSize, textProps } from '@shellcraft/ui';
+import { GAME_CONFIG } from '../config/game-config.js';
 import { GameModel } from '../models/game.js';
+import { APP_NAME, NoGame, InfoRow, BACK_HINTS, SCROLL_HINTS, useBackKeys, gameMeta } from './components.js';
 
-export class StatsScreen {
-  constructor(context) {
-    this.context = context;
-    this.screen = context.screen;
-    this.gameModel = new GameModel();
-    this.render();
+const h = React.createElement;
+const gameModel = new GameModel();
+
+const heading = (text) => h(Text, { bold: true, wrap: 'truncate-end' }, text);
+const blank = () => h(Text, null, ' ');
+
+/**
+ * Stats as one-row nodes for a ScrollView: progress rows across the
+ * panel, then skill checks and combat next to the action profile.
+ */
+export function statsRows(gameState, width) {
+  const { director, metrics, quests, time } = gameState.worldState;
+  const room = gameModel.getRoom(gameState.currentRoom);
+  const questList = Object.values(quests);
+  const completed = questList.filter((quest) => quest.status === 'completed').length;
+  const checks = metrics.checks;
+  const maxTension = GAME_CONFIG.systems.pacing.maxTension;
+
+  const progress = [
+    h(InfoRow, { label: 'Health', labelWidth: 12, value: `${gameState.player.health}/${gameState.player.maxHealth}` }),
+    h(InfoRow, { label: 'Turns', labelWidth: 12, value: gameState.moves }),
+    h(InfoRow, { label: 'Location', labelWidth: 12, value: room?.name ?? gameState.currentRoom }),
+    h(InfoRow, { label: 'Items', labelWidth: 12, value: `${gameState.inventory.length} held · peak ${metrics.inventoryPeak}` }),
+    h(InfoRow, { label: 'Quests', labelWidth: 12, value: `${completed}/${questList.length} completed` }),
+    h(InfoRow, { label: 'Director', labelWidth: 12, value: `${director.style} · ${director.lastBeat}` }),
+    h(InfoRow, { label: 'Tension', labelWidth: 12, value: `${director.tension}/${maxTension} · ${time.phase}` })
+  ];
+
+  const left = [
+    heading('Skill checks'),
+    h(InfoRow, { label: 'Total', labelWidth: 14, value: checks.passed + checks.partial + checks.failed }),
+    h(InfoRow, { label: 'Passed', labelWidth: 14, value: checks.passed }),
+    h(InfoRow, { label: 'Partial', labelWidth: 14, value: checks.partial }),
+    h(InfoRow, { label: 'Failed', labelWidth: 14, value: checks.failed }),
+    blank(),
+    heading('Combat'),
+    h(InfoRow, { label: 'Wins', labelWidth: 14, value: metrics.combatVictories }),
+    h(InfoRow, { label: 'Damage dealt', labelWidth: 14, value: metrics.damageDealt }),
+    h(InfoRow, { label: 'Damage taken', labelWidth: 14, value: metrics.damageTaken })
+  ];
+
+  const counted = Object.entries(metrics.actionCounts).filter(([, count]) => count > 0);
+  const right = [
+    heading('Action profile'),
+    ...(counted.length > 0
+      ? counted.map(([name, count]) => h(InfoRow, { label: name, labelWidth: 14, value: count }))
+      : [h(Text, { ...textProps('muted'), wrap: 'truncate-end' }, 'No actions yet')])
+  ];
+
+  const half = Math.max(Math.floor(width / 2), 1);
+  const columns = [];
+  for (let i = 0; i < Math.max(left.length, right.length); i++) {
+    columns.push(
+      h(
+        Box,
+        { width: '100%' },
+        h(Box, { width: half, flexShrink: 0, overflow: 'hidden' }, left[i] ?? null),
+        h(Box, { flexGrow: 1, flexShrink: 1, overflow: 'hidden' }, right[i] ?? null)
+      )
+    );
   }
 
-  render() {
-    const gameState = this.context.session.gameState;
-    const contentTop = 4;
-    const footerHeight = 3;
-    const availableHeight = Math.max(10, this.screen.height - contentTop - footerHeight);
-    const progressHeight = Math.max(6, Math.min(9, Math.floor(availableHeight * 0.45)));
-    const lowerTop = contentTop + progressHeight;
-    const lowerHeight = Math.max(4, availableHeight - progressHeight);
+  return [...progress, blank(), ...columns];
+}
 
-    UIComponents.createBox({
-      parent: this.screen,
-      top: 0,
-      left: 0,
-      width: '100%',
-      height: 3,
-      content: '{center}{bold}{yellow-fg}GAME STATS{/}',
-      tags: true
-    });
-
-    if (!gameState?.worldState) {
-      UIComponents.createBox({
-        parent: this.screen,
-        top: 4,
-        left: 2,
-        width: '96%',
-        height: 5,
-        content: '\n  No game in progress. Start a new adventure first!',
-        style: { border: { fg: 'red' } }
-      });
-      this.renderFooter();
-      return;
-    }
-
-    const currentRoom = this.gameModel.getRoom(gameState.currentRoom);
-    const director = gameState.worldState.director;
-    const checks = gameState.worldState.metrics.checks;
-    const checksTotal = checks.passed + checks.partial + checks.failed;
-    const actionCounts = gameState.worldState.metrics.actionCounts;
-    const questStats = Object.values(gameState.worldState.quests);
-    const completedQuests = questStats.filter((quest) => quest.status === 'completed').length;
-
-    UIComponents.createBox({
-      parent: this.screen,
-      top: contentTop,
-      left: 0,
-      width: '100%',
-      height: progressHeight,
-      label: ' Progress ',
-      content: `
-  {bold}Health:{/}            ${gameState.player.health} / ${gameState.player.maxHealth}
-  {bold}Turns Taken:{/}       ${gameState.moves}
-  {bold}Location:{/}          ${currentRoom?.name || gameState.currentRoom}
-  {bold}Items Collected:{/}   ${gameState.inventory.length}
-  {bold}Quests Completed:{/}  ${completedQuests} / ${questStats.length}
-  {bold}Director:{/}          ${director.style} (${director.lastBeat})
-  {bold}Tension:{/}           ${director.tension}  |  {bold}Phase:{/} ${gameState.worldState.time.phase}`,
-      tags: true,
-      style: { border: { fg: 'yellow' } }
-    });
-
-    UIComponents.createBox({
-      parent: this.screen,
-      top: lowerTop,
-      left: 0,
-      width: '50%',
-      height: lowerHeight,
-      label: ' Skill & Combat ',
-      content: `
-  Total: ${checksTotal}
-  Passed: ${checks.passed}
-  Partial: ${checks.partial}
-  Failed: ${checks.failed}
-
-  Combat Wins: ${gameState.worldState.metrics.combatVictories}
-  Damage Dealt: ${gameState.worldState.metrics.damageDealt}
-  Damage Taken: ${gameState.worldState.metrics.damageTaken}`,
-      style: { border: { fg: 'cyan' } }
-    });
-
-    const actionProfile = Object.entries(actionCounts)
-      .filter(([, count]) => count > 0)
-      .map(([key, count]) => `  ${key}: ${count}`)
-      .join('\n');
-
-    UIComponents.createBox({
-      parent: this.screen,
-      top: lowerTop,
-      right: 0,
-      width: '50%',
-      height: lowerHeight,
-      label: ' Action Profile ',
-      content: `\n${actionProfile || '  No actions recorded yet.'}`,
-      style: { border: { fg: 'magenta' } }
-    });
-
-    this.renderFooter();
-  }
-
-  renderFooter() {
-    UIComponents.createBox({
-      parent: this.screen,
-      bottom: 0,
-      left: 0,
-      width: '100%',
-      height: 3,
-      content: '{center}{gray-fg}b=back | q=quit{/}',
-      tags: true,
-      style: { fg: 'white' }
-    });
-
-    this.screen.key(['b', 'escape'], () => this.context.navigate('game'));
-  }
+export function StatsScreen({ ctx }) {
+  const gameState = ctx.session.gameState;
+  const { columns, rows } = useTerminalSize();
+  useBackKeys(ctx);
+  const hasGame = Boolean(gameState?.worldState);
+  const content = hasGame ? statsRows(gameState, Math.max(columns - 4, 2)) : null;
+  // Inner height: terminal minus bars (2), panel edges (2) and padding (2).
+  const fits = !content || content.length <= rows - 6;
+  return h(
+    Screen,
+    {
+      app: APP_NAME,
+      screen: 'Stats',
+      meta: gameMeta(gameState),
+      hints: fits ? BACK_HINTS : SCROLL_HINTS,
+      message: ctx.message
+    },
+    h(
+      Panel,
+      { title: 'Stats', focused: hasGame },
+      hasGame ? h(ScrollView, { rows: content }) : h(NoGame)
+    )
+  );
 }
