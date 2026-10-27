@@ -1,5 +1,5 @@
 import { nanoid } from 'nanoid';
-import crypto from 'crypto';
+import { fingerprintOf } from '@shellcraft/ui/auth';
 
 export class SessionManager {
   constructor() {
@@ -8,9 +8,8 @@ export class SessionManager {
 
   createSession(publicKey) {
     const id = nanoid();
-    const fingerprint = publicKey 
-      ? crypto.createHash('md5').update(publicKey.data).digest('hex')
-      : 'anonymous';
+    // "SHA256:..." as ssh-keygen -l shows it, or 'anonymous'.
+    const fingerprint = fingerprintOf(publicKey);
     
     const session = {
       id,

@@ -223,16 +223,18 @@ fingerprint. Users without a key get `'anonymous'`. Sessions live in memory
 and end with the connection.
 
 ```js
-// generated apps: OpenSSH style, as `ssh-keygen -l` shows it
-const fingerprint = `SHA256:${crypto.createHash('sha256').update(publicKey.data).digest('base64').replace(/=+$/, '')}`;
-// demo-shop and admin-dashboard use an MD5 hex digest instead
+import { fingerprintOf } from '@shellcraft/ui/auth';
+
+// OpenSSH style, as `ssh-keygen -l` shows it: "SHA256:..."
+const fingerprint = fingerprintOf(publicKey); // 'anonymous' without a key
 
 if (ctx.session.fingerprint === 'anonymous') {
   // connected without an SSH key
 }
 ```
 
-In a generated app, `src/server/auth.js` decides who gets in:
+Every SSH app signs users in with `authenticate()` from
+`@shellcraft/ui/auth` (a generated app wraps it in `src/server/auth.js`):
 
 | Method | Answer |
 |---|---|
@@ -242,8 +244,11 @@ In a generated app, `src/server/auth.js` decides who gets in:
 
 OpenSSH tries `none` first. A server that accepts `none` lets everyone in
 before they offer a key, so every session is anonymous. ssh2 does not check
-key signatures itself; `auth.js` does, with `utils.parseKey(ctx.key.data)`
-and `key.verify(ctx.blob, ctx.signature, ctx.hashAlgo)`.
+key signatures itself; `authenticate()` does, with
+`utils.parseKey(ctx.key.data)` and
+`key.verify(ctx.blob, ctx.signature, ctx.hashAlgo)`. ssh2 clients without a
+key need `tryKeyboard: true` and a `'keyboard-interactive'` handler that
+answers `finish([])`.
 
 ### SSH user name (adventure-game)
 
@@ -259,8 +264,14 @@ const session = sessionManager.createSession(username); // finds or creates 'ali
 The demo apps and generated apps let everyone in. Before you deploy, check
 credentials in the authentication handler (`src/server/auth.js` in a
 generated app, `client.on('authentication', ...)` in `src/server/index.js` in
-the demo apps). For keys, compare the verified key with a list of allowed
-keys. For passwords:
+the demo apps). For keys, allow only known ones and no anonymous users:
+
+```js
+const allowed = new Set(['SHA256:...']);
+authenticate(ctx, onKey, { anonymous: false, allowKey: (key) => allowed.has(fingerprintOf(key)) });
+```
+
+For passwords:
 
 ```js
 client.on('authentication', (ctx) => {
@@ -428,7 +439,7 @@ For a generated app (it has `vendor/ui` and a `.dockerignore`):
 ```dockerfile
 FROM node:24-alpine
 WORKDIR /app
-COPY package*.json .npmrc ./
+COPY package*.json ./
 COPY vendor ./vendor
 RUN npm ci --omit=dev
 COPY . .

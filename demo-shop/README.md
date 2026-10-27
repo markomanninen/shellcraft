@@ -124,10 +124,15 @@ export const screens = {
 
 ## 🔐 Authentication
 
-The server supports two authentication modes:
+The server signs users in with `authenticate()` from
+[`@shellcraft/ui/auth`](../ui/README.md#ssh-authentication-shellcraftuiauth):
 
-1. **Public Key**: Users connecting with SSH keys get a unique fingerprint
-2. **Anonymous**: Users without keys can connect anonymously
+1. **Public key**: the client must prove it holds the key; the session gets
+   its fingerprint (`SHA256:...`, as `ssh-keygen -l` shows it)
+2. **Anonymous**: a client without a key signs in through
+   keyboard-interactive, with no prompts
+
+The `none` method and passwords are turned away, so OpenSSH offers its keys.
 
 Access the session in any screen:
 

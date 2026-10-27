@@ -2,6 +2,7 @@ import { describe, it, before, after } from 'node:test';
 import { strict as assert } from 'assert';
 import { Client } from 'ssh2';
 import { spawn } from 'child_process';
+import { generateKeyPairSync } from 'crypto';
 import fs from 'fs';
 import net from 'net';
 import os from 'os';
@@ -74,6 +75,8 @@ describe('SSH Server E2E', () => {
 
   it('should accept SSH connection', (t, done) => {
     const conn = new Client();
+    // No key: anonymous through keyboard-interactive, no prompts.
+    conn.on('keyboard-interactive', (_name, _instructions, _lang, _prompts, finish) => finish([]));
 
     conn.on('ready', () => {
       conn.end();
@@ -88,12 +91,14 @@ describe('SSH Server E2E', () => {
       host: 'localhost',
       port: TEST_PORT,
       username: 'test',
-      password: 'test' // Will be rejected but connection should work
+      tryKeyboard: true
     });
   });
 
   it('should accept anonymous connection', (t, done) => {
     const conn = new Client();
+    // No key: anonymous through keyboard-interactive, no prompts.
+    conn.on('keyboard-interactive', (_name, _instructions, _lang, _prompts, finish) => finish([]));
     let shellReceived = false;
 
     conn.on('ready', () => {
@@ -125,12 +130,14 @@ describe('SSH Server E2E', () => {
       host: 'localhost',
       port: TEST_PORT,
       username: 'test',
-      tryKeyboard: false
+      tryKeyboard: true
     });
   });
 
   it('should render the menu in a pty, resize, and quit on q', (t, done) => {
     const conn = new Client();
+    // No key: anonymous through keyboard-interactive, no prompts.
+    conn.on('keyboard-interactive', (_name, _instructions, _lang, _prompts, finish) => finish([]));
     let output = '';
     let step = 'menu';
     const plain = () => output.replace(/\u001B\[[0-?]*[ -/]*[@-~]/g, '');
@@ -177,7 +184,35 @@ describe('SSH Server E2E', () => {
       host: 'localhost',
       port: TEST_PORT,
       username: 'e2e-player',
-      tryKeyboard: false
+      tryKeyboard: true
     });
+  });
+
+  /** Connect and resolve once signed in; reject with ssh2's error. */
+  function signIn(options) {
+    const conn = new Client();
+    conn.on('keyboard-interactive', (_name, _instructions, _lang, _prompts, finish) => finish([]));
+    return new Promise((resolve, reject) => {
+      conn.on('ready', () => {
+        conn.end();
+        resolve();
+      });
+      conn.on('error', reject);
+      conn.connect({ host: 'localhost', port: TEST_PORT, username: 'test', readyTimeout: 5000, ...options });
+    });
+  }
+
+  it('accepts a client key (the server checks its signature)', async () => {
+    const { privateKey } = generateKeyPairSync('rsa', {
+      modulusLength: 2048,
+      privateKeyEncoding: { type: 'pkcs1', format: 'pem' },
+      publicKeyEncoding: { type: 'spki', format: 'pem' }
+    });
+    await signIn({ privateKey, tryKeyboard: false });
+  });
+
+  it('turns away none and passwords (OpenSSH would never offer its keys)', async () => {
+    await assert.rejects(signIn({ tryKeyboard: false }), /authentication methods failed/);
+    await assert.rejects(signIn({ password: 'test', tryKeyboard: false }), /authentication methods failed/);
   });
 });

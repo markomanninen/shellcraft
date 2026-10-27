@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import ssh2 from 'ssh2';
+import { authenticate } from '@shellcraft/ui/auth';
 import { runtimeConfig } from '../config/runtime-config.js';
 
 const { Server } = ssh2;
@@ -39,10 +40,12 @@ class TerminalServer {
     let username = null;
 
     client.on('authentication', (ctx) => {
-      // Capture username (always available — it's the SSH login name)
+      // The SSH login name keys the saved game (resume across connections).
       username = ctx.username;
-      // Accept any auth method — no password prompt
-      ctx.accept();
+      // A key must be proven; without one the player signs in through
+      // keyboard-interactive with no prompts. 'none' and passwords are
+      // turned away. See @shellcraft/ui/auth.
+      authenticate(ctx);
     });
 
     client.on('ready', () => {
