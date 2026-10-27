@@ -188,6 +188,7 @@ cat > src/server/index.js << 'EOL'
 import fs from 'fs';
 import ssh2 from 'ssh2';
 import dotenv from 'dotenv';
+import { authenticate } from './auth.js';
 import { CommandRouter } from './router.js';
 import { SessionManager } from './session.js';
 
@@ -224,17 +225,13 @@ class TerminalServer {
     let publicKey = null;
     let username = null;
 
+    // Everyone gets in, with a verified key or anonymously (see auth.js).
+    // Fine for local development, not for a public server.
     client.on('authentication', (ctx) => {
       username = ctx.username || null;
-      if (ctx.method === 'publickey') {
-        publicKey = ctx.key;
-        ctx.accept();
-      } else if (ctx.method === 'none') {
-        // Anonymous access: fine for local development, not for a public server.
-        ctx.accept();
-      } else {
-        ctx.reject();
-      }
+      authenticate(ctx, (key) => {
+        publicKey = key;
+      });
     });
 
     client.on('ready', () => {
@@ -284,6 +281,44 @@ class TerminalServer {
 
 const server = new TerminalServer();
 server.start();
+EOL
+
+# Create authentication handler
+cat > src/server/auth.js << 'EOL'
+import ssh2 from 'ssh2';
+
+const { utils } = ssh2;
+
+/** The methods the server offers when it rejects one. */
+export const AUTH_METHODS = ['publickey', 'keyboard-interactive'];
+
+/**
+ * ssh2 'authentication' handler for a server that lets everyone in.
+ *
+ * - publickey: any key, but the client must prove that it holds the key
+ *   (ssh2 leaves the signature check to the app). onKey(ctx.key) is called
+ *   for a verified key, which becomes the session's fingerprint.
+ * - keyboard-interactive: accepted without prompts: an anonymous session.
+ * - none, password and the rest: rejected, offering the two methods above.
+ *   OpenSSH tries 'none' first; accepting it would make every user
+ *   anonymous, even one with a key.
+ *
+ * For a real deployment, check the key against a list of allowed keys here.
+ */
+export function authenticate(ctx, onKey = () => {}) {
+  if (ctx.method === 'publickey') {
+    const key = utils.parseKey(ctx.key.data);
+    if (!key || key instanceof Error) return ctx.reject(AUTH_METHODS);
+    if (ctx.signature) {
+      if (key.verify(ctx.blob, ctx.signature, ctx.hashAlgo) !== true) return ctx.reject(AUTH_METHODS);
+      onKey(ctx.key);
+    }
+    // Without a signature the client only asks whether this key would do.
+    return ctx.accept();
+  }
+  if (ctx.method === 'keyboard-interactive') return ctx.accept();
+  return ctx.reject(AUTH_METHODS);
+}
 EOL
 
 # Create router
@@ -1300,9 +1335,9 @@ ssh localhost -p 2222
 
 `q` quits (except while you type in a field). Ctrl-C always quits.
 
-**Security:** the server accepts anonymous connections. It is meant for
-local development. Add real authentication in `src/server/index.js` before
-you expose it to a network.
+**Security:** the server lets everyone in, also without a key. It is meant
+for local development. Add real authentication in `src/server/auth.js`
+before you expose it to a network.
 
 EOL
 
@@ -1315,6 +1350,7 @@ src/
 ├── config.js            # APP_NAME for the title bar
 ├── server/
 │   ├── index.js         # SSH server
+│   ├── auth.js          # who gets in: a verified key, or anonymous
 │   ├── router.js        # passes each shell to serve()
 │   └── session.js       # one session per connection
 └── ui/
@@ -1323,7 +1359,7 @@ src/
     ├── guide.js         # Getting started: scrolling text
     └── session-info.js  # Session: table about this connection
 test/
-├── unit/                # session, screens, SSH adapter
+├── unit/                # auth, session, screens, SSH adapter
 ├── e2e/                 # the real SSH server
 └── helpers/
 scripts/generate-keys.js # host key
@@ -1347,6 +1383,7 @@ src/
 ├── models/product.js    # products
 ├── server/
 │   ├── index.js         # SSH server
+│   ├── auth.js          # who gets in: a verified key, or anonymous
 │   ├── router.js        # passes each shell to serve()
 │   └── session.js       # one session (and cart) per connection
 └── ui/
@@ -1357,7 +1394,7 @@ src/
     ├── checkout.js      # Checkout form and validation
     └── cart-summary.js  # cart helpers and the summary block
 test/
-├── unit/                # product, session, screens, SSH adapter
+├── unit/                # product, auth, session, screens, SSH adapter
 ├── e2e/                 # the real SSH server, shopping workflow
 └── helpers/
 scripts/generate-keys.js # host key
@@ -1382,6 +1419,12 @@ cat >> README.md << 'EOL'
 
 - `src/server/index.js` accepts SSH connections and creates a session for
   each. For every shell it calls `CommandRouter.handleConnection()`.
+- `src/server/auth.js` decides who gets in. A client with a key must prove
+  that it holds the key; the session then stores the key's fingerprint
+  (`SHA256:...`, as `ssh-keygen -l` shows it). A client without a key signs
+  in anonymously through keyboard-interactive, without prompts. The `none`
+  method alone is not enough: OpenSSH tries it first, and accepting it would
+  make every user anonymous.
 - `src/server/router.js` passes the channel to `serve()` from
   `@shellcraft/ui`. `serve()` renders the Ink app on the channel. It takes
   care of what SSH needs: the terminal size, CRLF line ends, the 16 ANSI
@@ -1734,6 +1777,84 @@ describe('SessionManager', () => {
     const ids = new Set(Array.from({ length: 20 }, () => manager.createSession(null).id));
 
     assert.strictEqual(ids.size, 20);
+  });
+});
+EOL
+
+cat > test/unit/auth.test.js << 'EOL'
+import { describe, it } from 'node:test';
+import { strict as assert } from 'assert';
+import { generateKeyPairSync } from 'crypto';
+import ssh2 from 'ssh2';
+import { authenticate, AUTH_METHODS } from '../../src/server/auth.js';
+import { fingerprintOf } from '../../src/server/session.js';
+
+const { utils } = ssh2;
+
+/** A fake ssh2 authentication context that records the answer. */
+function fakeCtx(method, extra = {}) {
+  const ctx = { method, username: 'alice', result: null, ...extra };
+  ctx.accept = () => { ctx.result = 'accept'; };
+  ctx.reject = (methods) => { ctx.result = 'reject'; ctx.offered = methods; };
+  return ctx;
+}
+
+function clientKey() {
+  const { privateKey } = generateKeyPairSync('rsa', {
+    modulusLength: 2048,
+    privateKeyEncoding: { type: 'pkcs1', format: 'pem' }
+  });
+  const key = utils.parseKey(privateKey);
+  return { key, publicKey: { algo: key.type, data: key.getPublicSSH() } };
+}
+
+describe('authenticate', () => {
+  it('rejects none and passwords, offering publickey and keyboard-interactive', () => {
+    for (const method of ['none', 'password', 'hostbased']) {
+      const ctx = fakeCtx(method);
+      authenticate(ctx);
+      assert.equal(ctx.result, 'reject', method);
+      assert.deepEqual(ctx.offered, AUTH_METHODS);
+    }
+  });
+
+  it('lets a client without a key in through keyboard-interactive, without prompts', () => {
+    const ctx = fakeCtx('keyboard-interactive');
+    let key = null;
+    authenticate(ctx, (k) => { key = k; });
+    assert.equal(ctx.result, 'accept');
+    assert.equal(key, null, 'anonymous');
+  });
+
+  it('answers a key query without a signature, but does not trust the key yet', () => {
+    const { publicKey } = clientKey();
+    const ctx = fakeCtx('publickey', { key: publicKey });
+    let key = null;
+    authenticate(ctx, (k) => { key = k; });
+    assert.equal(ctx.result, 'accept');
+    assert.equal(key, null);
+  });
+
+  it('accepts a key with a valid signature and reports it', () => {
+    const { key: privateKey, publicKey } = clientKey();
+    const blob = Buffer.from('session id and request');
+    const ctx = fakeCtx('publickey', { key: publicKey, blob, signature: privateKey.sign(blob) });
+    let key = null;
+    authenticate(ctx, (k) => { key = k; });
+    assert.equal(ctx.result, 'accept');
+    assert.equal(key, publicKey);
+    assert.match(fingerprintOf(key), /^SHA256:/);
+  });
+
+  it('rejects a key whose signature does not match', () => {
+    const { publicKey } = clientKey();
+    const other = clientKey().key;
+    const blob = Buffer.from('session id and request');
+    const ctx = fakeCtx('publickey', { key: publicKey, blob, signature: other.sign(blob) });
+    let key = null;
+    authenticate(ctx, (k) => { key = k; });
+    assert.equal(ctx.result, 'reject');
+    assert.equal(key, null);
   });
 });
 EOL
@@ -2288,6 +2409,7 @@ echo "🧪 Creating E2E tests..."
 cat > test/e2e/server.test.js << 'EOL'
 import { describe, it, before, after } from 'node:test';
 import { strict as assert } from 'assert';
+import { generateKeyPairSync } from 'crypto';
 import ssh2 from 'ssh2';
 import { startServer } from '../helpers/server.js';
 import { APP_NAME } from '../../src/config.js';
@@ -2309,9 +2431,13 @@ describe('SSH server (e2e)', () => {
     await server?.stop();
   });
 
-  /** Connect a client; run(conn, resolve, reject) once it is ready. */
+  /**
+   * Connect a client; run(conn, resolve, reject) once it is ready. Without
+   * a key the client signs in anonymously (keyboard-interactive, no prompts).
+   */
   function withClient(run, options = {}) {
     const conn = new Client();
+    conn.on('keyboard-interactive', (_name, _instructions, _lang, _prompts, finish) => finish([]));
     return new Promise((resolve, reject) => {
       conn.on('ready', () => run(conn, resolve, reject));
       conn.on('error', reject);
@@ -2319,18 +2445,33 @@ describe('SSH server (e2e)', () => {
         host: '127.0.0.1',
         port: server.port,
         username: 'test',
-        tryKeyboard: false,
+        tryKeyboard: true,
         readyTimeout: 5000,
         ...options
       });
     }).finally(() => conn.end());
   }
 
-  it('accepts an SSH connection', { timeout: 15000 }, async () => {
-    await withClient((_conn, resolve) => resolve(), { password: 'test' });
+  it('lets a client without a key in (keyboard-interactive, no prompts)', { timeout: 15000 }, async () => {
+    await withClient((_conn, resolve) => resolve());
   });
 
-  it('accepts an anonymous connection and opens a shell', { timeout: 15000 }, async () => {
+  it('accepts a client key (the server checks the signature)', { timeout: 15000 }, async () => {
+    const { privateKey } = generateKeyPairSync('rsa', {
+      modulusLength: 2048,
+      privateKeyEncoding: { type: 'pkcs1', format: 'pem' }
+    });
+    await withClient((_conn, resolve) => resolve(), { privateKey, tryKeyboard: false });
+  });
+
+  it('does not accept the none method alone', { timeout: 15000 }, async () => {
+    await assert.rejects(
+      withClient((_conn, resolve) => resolve(), { tryKeyboard: false }),
+      /authentication methods failed/
+    );
+  });
+
+  it('opens a shell for an anonymous client', { timeout: 15000 }, async () => {
     await withClient((conn, resolve, reject) => {
       conn.shell((err, stream) => {
         if (err) return reject(err);
