@@ -1,7 +1,9 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Quick Start - Run Your First Demo!
-# Choose which demo to try:
+# Choose which demo to try. All demos use Ink through the shared ui/ package.
+
+cd "$(dirname "$0")" || exit 1
 
 echo ""
 echo "🎉 Terminal App Template - Quick Demo Launcher"
@@ -22,144 +24,115 @@ echo ""
 echo "  3) 🖥️  Admin Dashboard (System Monitor)"
 echo "     - CPU & Memory stats"
 echo "     - Process monitor"
-echo "     - Real-time data from YOUR Mac"
+echo "     - Real-time data from this machine"
 echo ""
 echo "  4) 🎨 Animation Demo (ASCII Art)"
 echo "     - 7 terminal animations"
 echo "     - Runs directly (no SSH)"
 echo ""
-echo "  5) 🧪 Run Tests (Verify everything works)"
+echo "  5) 🧪 Run Tests (ui package and Demo Shop)"
 echo ""
 echo "  6) 🆕 Create New App (Use the template)"
 echo ""
 echo "  0) Exit"
 echo ""
 
-read -p "Enter choice [0-6]: " choice
+read -r -p "Enter choice [0-6]: " choice
+
+# Install dependencies and a host key for an SSH demo, then start it.
+start_ssh_demo() {
+  local dir="$1"
+  local name="$2"
+  echo ""
+  echo "Starting $name..."
+  cd "$dir" || exit 1
+  if [ ! -d "node_modules" ]; then
+    echo "📦 Installing dependencies..."
+    ./npmw install || exit 1
+  fi
+  if [ ! -f "keys/host_key" ]; then
+    echo "🔐 Generating SSH keys..."
+    ./npmw run generate-keys || exit 1
+  fi
+  echo ""
+  echo "✅ Ready! Starting server..."
+  echo "🌐 Connect with: ssh localhost -p 2222"
+  echo "⚠️  Press Ctrl+C to stop server"
+  echo ""
+  ./npmw start
+}
 
 case $choice in
   1)
-    echo ""
-    echo "🛒 Starting Demo Shop..."
-    cd demo-shop || exit
-    if [ ! -d "node_modules" ]; then
-      echo "📦 Installing dependencies..."
-      npm install
-    fi
-    if [ ! -f "keys/host_key" ]; then
-      echo "🔐 Generating SSH keys..."
-      npm run generate-keys
-    fi
-    echo ""
-    echo "✅ Ready! Starting server..."
-    echo "🌐 Connect with: ssh localhost -p 2222"
-    echo "⚠️  Press Ctrl+C to stop server"
-    echo ""
-    npm start
+    start_ssh_demo demo-shop "🛒 Demo Shop"
     ;;
-  
+
   2)
-    echo ""
-    echo "⚔️  Starting Adventure Game..."
-    cd adventure-game || exit
-    if [ ! -d "node_modules" ]; then
-      echo "📦 Installing dependencies..."
-      npm install
-    fi
-    if [ ! -f "keys/host_key" ]; then
-      echo "🔐 Generating SSH keys..."
-      npm run generate-keys
-    fi
-    echo ""
-    echo "✅ Ready! Starting server..."
-    echo "🌐 Connect with: ssh localhost -p 2222"
-    echo "⚠️  Press Ctrl+C to stop server"
-    echo ""
-    npm start
+    start_ssh_demo adventure-game "⚔️  Adventure Game"
     ;;
-  
+
   3)
-    echo ""
-    echo "🖥️  Starting Admin Dashboard..."
-    cd admin-dashboard || exit
-    if [ ! -d "node_modules" ]; then
-      echo "📦 Installing dependencies..."
-      npm install
-    fi
-    if [ ! -f "keys/host_key" ]; then
-      echo "🔐 Generating SSH keys..."
-      npm run generate-keys
-    fi
-    echo ""
-    echo "✅ Ready! Starting server..."
-    echo "🌐 Connect with: ssh localhost -p 2222"
-    echo "⚠️  Press Ctrl+C to stop server"
-    echo ""
-    npm start
+    start_ssh_demo admin-dashboard "🖥️  Admin Dashboard"
     ;;
-  
+
   4)
     echo ""
     echo "🎨 Starting Animation Demo..."
-    cd animation-demo || exit
+    cd animation-demo || exit 1
     if [ ! -d "node_modules" ]; then
       echo "📦 Installing dependencies..."
-      npm install
+      ./npmw install || exit 1
     fi
     echo ""
     echo "✅ Ready! Starting animations..."
     echo "⚠️  Press q or Ctrl+C to stop"
     echo ""
-    npm start
+    ./npmw start
     ;;
 
   5)
     echo ""
     echo "🧪 Running Tests..."
     echo ""
-    cd demo-shop || exit
-    if [ ! -d "node_modules" ]; then
-      echo "📦 Installing dependencies..."
-      npm install
-    fi
-    if [ ! -f "keys/host_key" ]; then
-      echo "🔐 Generating SSH keys..."
-      npm run generate-keys
-    fi
+    for dir in ui demo-shop; do
+      if [ ! -d "$dir/node_modules" ]; then
+        echo "📦 Installing dependencies in $dir..."
+        (cd "$dir" && npm ci) || exit 1
+      fi
+    done
     echo ""
-    echo "Running unit tests..."
-    npm run test:unit
+    echo "Running ui tests..."
+    (cd ui && npm test) || { echo "❌ ui tests failed"; exit 1; }
+    echo ""
+    echo "Running Demo Shop unit tests..."
+    (cd demo-shop && ./npmw run test:unit) || { echo "❌ Demo Shop tests failed"; exit 1; }
     echo ""
     echo "✅ All tests passed!"
     echo ""
     ;;
-  
+
   6)
     echo ""
-    read -p "Enter your app name: " appname
+    read -r -p "Enter your app name: " appname
     if [ -z "$appname" ]; then
       appname="my-terminal-app"
     fi
+    read -r -p "App type, minimal or ecommerce [minimal]: " apptype
+    if [ -z "$apptype" ]; then
+      apptype="minimal"
+    fi
     echo ""
     echo "🆕 Creating new app: $appname"
-    ./init.sh "$appname"
-    echo ""
-    echo "✅ App created! Next steps:"
-    echo "   cd $appname"
-    echo "   npm install"
-    echo "   npm run generate-keys"
-    echo "   npm test"
-    echo "   npm start"
-    echo ""
+    ./init.sh "$appname" "$apptype"
     ;;
-  
+
   0)
     echo ""
     echo "👋 Goodbye!"
     echo ""
     exit 0
     ;;
-  
+
   *)
     echo ""
     echo "❌ Invalid choice. Please run again and choose 0-6."
