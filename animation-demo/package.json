@@ -9,7 +9,7 @@
   },
   "scripts": {
     "start": "node index.js",
-    "test": "node --test test/*.test.js"
+    "test": "node --test --test-timeout=30000 test/*.test.js"
   },
   "dependencies": {
     "@shellcraft/ui": "file:../ui",

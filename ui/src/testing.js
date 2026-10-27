@@ -191,6 +191,27 @@ export function renderTerminal(element, { columns = 80, rows = 24 } = {}) {
 
   const lastFrame = () => stdout.frames.at(-1) ?? '';
 
+  // After input: wait at least `min` ms, then for the frame the input causes
+  // (if it causes one), then until no new frame has come for `quiet` ms. A
+  // fixed sleep was enough on a fast machine but not on a loaded CI runner.
+  // `max` bounds screens that animate without pause.
+  async function settle(before, min = 20, { appear = 200, quiet = 20, max = 600 } = {}) {
+    const start = Date.now();
+    await tick(min);
+    while (stdout.frames.length === before && Date.now() - start < appear) await tick(5);
+    let count = stdout.frames.length;
+    let still = Date.now();
+    while (Date.now() - start < max) {
+      await tick(5);
+      if (stdout.frames.length !== count) {
+        count = stdout.frames.length;
+        still = Date.now();
+      } else if (Date.now() - still >= quiet) {
+        break;
+      }
+    }
+  }
+
   return {
     stdout,
     stdin,
@@ -203,24 +224,27 @@ export function renderTerminal(element, { columns = 80, rows = 24 } = {}) {
     rerender: (next) => instance.rerender(next),
     unmount: () => instance.unmount(),
     waitUntilExit: () => instance.waitUntilExit(),
-    /** Write raw input; resolves after the app had a chance to re-render. */
+    /** Write raw input; resolves once the app has re-rendered (see settle). */
     async write(data, wait = 20) {
+      const before = stdout.frames.length;
       stdin.write(data);
-      await tick(wait);
+      await settle(before, wait);
     },
     /** Press keys by name (see `keys`) or literal text, one after another. */
     async press(...names) {
       for (const name of names) {
+        const before = stdout.frames.length;
         stdin.write(keys[name] ?? name);
         // A lone ESC waits for the rest of a possible escape sequence.
-        await tick(name === 'escape' ? 80 : 20);
+        await settle(before, name === 'escape' ? 80 : 20);
       }
     },
     async resize(nextColumns, nextRows) {
+      const before = stdout.frames.length;
       stdout.columns = nextColumns;
       stdout.rows = nextRows;
       stdout.emit('resize');
-      await tick(20);
+      await settle(before);
     }
   };
 }
