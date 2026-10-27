@@ -58,13 +58,14 @@ Apps made by `init.sh` store a SHA256 fingerprint in OpenSSH format
 
 | Aspect | Demo Shop | Adventure Game | Admin Dashboard | Animation Demo |
 |--------|-----------|----------------|-----------------|----------------|
-| Unit tests | yes | yes | yes | see note |
-| Screen tests (`@shellcraft/ui/testing`) | yes | yes | yes | see note |
-| E2E tests over SSH | yes | yes | yes | N/A |
+| Unit tests | yes | yes | yes | yes |
+| Screen tests (`@shellcraft/ui/testing`) | yes | yes | yes | yes |
+| E2E tests over SSH | yes | yes | yes | N/A (no SSH) |
 | Test runner | `node:test` | `node:test` | `node:test` | `node:test` |
 
-Note: animation-demo has no SSH server. Its tests come with its Ink port
-(`createFakeTty()` from the testing helpers drives `renderLocal()`).
+Note: animation-demo has no SSH server. Its screen tests use
+`renderTerminal()`, and `test/local.test.js` runs the app through
+`renderLocal()` on a fake TTY (`createFakeTty()`) into a headless xterm.
 
 ## npm Scripts
 
