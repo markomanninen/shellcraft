@@ -34,7 +34,6 @@ import {
   narrativeLines,
   journalEntries,
   roomStatus,
-  objectiveText,
   healthTone,
   tensionTone,
   needsTurn
@@ -58,11 +57,9 @@ export function roomLayout(columns, rows) {
   return { body, top, bottom, left, right: columns - left };
 }
 
-function StatusPanel({ gameState, status, height }) {
-  const { player, director, encounter, itemsHere } = status;
+function StatusPanel({ status, height }) {
+  const { player, director, encounter, itemsHere, inventory, objective } = status;
   const maxTension = GAME_CONFIG.systems.pacing.maxTension;
-  const objective = objectiveText(gameState);
-  const inventory = gameState.inventory;
   return h(
     Panel,
     { title: 'Status', height, paddingX: 0, paddingY: 1 },
@@ -325,7 +322,7 @@ export function RoomScreen({ ctx }) {
     : h(
         Box,
         { flexDirection: 'column', flexGrow: 1 },
-        h(StatusPanel, { gameState, status, height: layout.top }),
+        h(StatusPanel, { status, height: layout.top }),
         h(
           Panel,
           { title: 'Journal' },

@@ -170,9 +170,17 @@ export function nextAction(gameState) {
     : (gameState.pendingAction || GAME_CONFIG.gameplay.genericActions[0]);
 }
 
-/** The room response the screens render, from a resolved turn and its narration. */
-export function buildResponse(turn, narration) {
+/**
+ * The room response the screens render, from a resolved turn and its
+ * narration. With the game state, the response also keeps the inventory
+ * and objective after the turn, so the Status panel does not run ahead
+ * of the story while the next turn is being narrated.
+ */
+export function buildResponse(turn, narration, gameState = null) {
   return {
+    ...(gameState
+      ? { inventory: [...gameState.inventory], objective: objectiveText(gameState) }
+      : {}),
     room_name: turn.room.name,
     description: narration.response.description,
     items_here: turn.itemsHere,
@@ -307,7 +315,10 @@ export function roomStatus(gameState) {
       director: response.director,
       encounter: response.active_encounter ?? null,
       itemsHere: response.items_here,
-      phase: response.phase
+      phase: response.phase,
+      // Responses saved before the port have no snapshot: live values.
+      inventory: Array.isArray(response.inventory) ? response.inventory : gameState.inventory,
+      objective: 'objective' in response ? response.objective : objectiveText(gameState)
     };
   }
   const encounter = Object.values(gameState.worldState.encounters)
@@ -318,6 +329,8 @@ export function roomStatus(gameState) {
     director: gameState.worldState.director,
     encounter,
     itemsHere: gameState.worldState.roomItems[gameState.currentRoom] ?? [],
-    phase: gameState.worldState.time.phase
+    phase: gameState.worldState.time.phase,
+    inventory: gameState.inventory,
+    objective: objectiveText(gameState)
   };
 }

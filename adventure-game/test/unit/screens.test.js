@@ -176,6 +176,7 @@ describe('Adventure screens (80x24)', () => {
     raw = t.lastFrame();
     assert.equal(styleAt(raw, 'Go north').dim, true, 'actions muted while waiting');
     assert.equal(styleAt(raw, 'Go north').bg, undefined, 'no selection while waiting');
+    assert.ok(t.text().includes(' Threat     none'), 'the status waits for the narration too');
     assert.equal(llm.calls.length, 2);
     assert.equal(llm.calls[1].action_text, 'Go north');
     await t.press('2', 'tab');

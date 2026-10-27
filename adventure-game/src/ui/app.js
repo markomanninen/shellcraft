@@ -117,7 +117,7 @@ export function AdventureApp({ session, saveGame = () => {}, llm, rules, initial
       if (session.gameState !== gameState) return;
 
       const turn = gameState.pendingTurn;
-      const response = validateRenderableResponse(buildResponse(turn, narration));
+      const response = validateRenderableResponse(buildResponse(turn, narration, gameState));
       gameState.messageHistory = narration.messages;
       delete gameState.pendingTurn;
       gameState.lastTurn = turn;
