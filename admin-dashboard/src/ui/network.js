@@ -1,71 +1,57 @@
-import { UIComponents } from './components.js';
-import { SystemModel } from '../models/system.js';
+import React from 'react';
+import { Box, Panel, Table, ScrollView, EmptyState, useTerminalSize } from '@shellcraft/ui';
+import { AdminScreen, Blank, InfoRow, infoRows, screenHints, useData, useScreenKeys, SUMMARY_LABEL_WIDTH } from './parts.js';
+import { NETWORK_COLUMNS, networkRows } from './tables.js';
 
-export class NetworkScreen {
-  constructor(context) {
-    this.context = context;
-    this.screen = context.screen;
-    this.systemModel = new SystemModel();
-    this.render();
-  }
+const h = React.createElement;
 
-  render() {
-    const header = UIComponents.createBox({
-      parent: this.screen,
-      top: 0,
-      left: 0,
-      width: '100%',
-      height: 3,
-      content: '{center}{bold}{magenta-fg}NETWORK INFO{/}',
-      tags: true
-    });
+const isIPv4 = (iface) => iface.family === 'IPv4' || iface.family === 4;
 
-    const interfaces = this.systemModel.getNetworkInfo();
+/** Home detail panel for "Network": counts, then each IPv4 address. */
+export function NetworkSummary({ ctx }) {
+  const { data, error } = useData(() => ctx.system.getNetworkInfo());
+  if (error) return h(EmptyState, { message: error });
+  const interfaces = data ?? [];
+  const names = new Set(interfaces.map((i) => i.interface));
+  return h(
+    Box,
+    { flexDirection: 'column', flexGrow: 1 },
+    ...infoRows([
+      ['Interfaces', String(names.size)],
+      ['Addresses', String(interfaces.length)]
+    ], SUMMARY_LABEL_WIDTH),
+    h(Blank),
+    h(ScrollView, {
+      rows: interfaces
+        .filter(isIPv4)
+        .map((i) => h(InfoRow, { label: i.interface, value: i.address, labelWidth: SUMMARY_LABEL_WIDTH })),
+      isActive: false
+    })
+  );
+}
 
-    const table = UIComponents.createTable({
-      parent: this.screen,
-      top: 4,
-      left: 2,
-      width: '96%',
-      height: '80%',
-      label: ' Network Interfaces ',
-      data: [
-        ['Interface', 'Address', 'Family', 'Netmask', 'Internal'],
-        ...interfaces.map(iface => [
-          iface.interface,
-          iface.address,
-          iface.family,
-          iface.netmask,
-          iface.internal
-        ])
-      ],
-      style: {
-        border: { fg: 'magenta' }
-      }
-    });
+/** Network: every address of every interface. r refreshes. */
+export function NetworkScreen({ ctx }) {
+  const { data, error, refresh } = useData(() => ctx.system.getNetworkInfo());
+  useScreenKeys(ctx, refresh);
+  const { rows } = useTerminalSize();
+  // Title bar, panel top, table header, panel bottom, status bar.
+  const height = Math.max(rows - 5, 1);
+  const interfaces = data ?? [];
 
-    const backBtn = UIComponents.createButton({
-      parent: this.screen,
-      bottom: 3,
-      left: 'center',
-      width: 15,
-      height: 3,
-      content: ' Back ',
-      name: 'back'
-    });
+  let body;
+  if (error) body = h(EmptyState, { message: 'No network information.', hint: 'Try again:', k: 'r', label: 'refresh' });
+  else if (interfaces.length === 0) body = h(EmptyState, { message: 'No network interfaces.' });
+  else body = h(Table, { columns: NETWORK_COLUMNS, rows: networkRows(interfaces), selectedIndex: -1, height });
 
-    backBtn.on('press', () => {
-      this.context.navigate('dashboard');
-    });
-
-    this.screen.key(['r'], () => {
-      this.context.navigate('network');
-    });
-
-    this.screen.key(['b', 'escape'], () => {
-      this.context.navigate('dashboard');
-    });
-
-    backBtn.focus();
-  }
+  return h(
+    AdminScreen,
+    {
+      ctx,
+      screen: 'Network',
+      hints: screenHints({ scroll: interfaces.length > height, refresh: true }),
+      message: error ? { tone: 'error', text: error } : undefined
+    },
+    h(Panel, { title: 'Network interfaces', focused: true, padding: 0 }, body)
+  );
 }

@@ -57,10 +57,8 @@ class TerminalServer {
           const stream = accept();
           
           try {
-            // Initialize UI
-            console.log('Initializing UI...');
-            this.router.handleConnection(stream, session, ptyInfo);
-            console.log('UI initialized successfully');
+            // Initialize UI (session_stream carries 'window-change' resizes)
+            this.router.handleConnection(stream, session, ptyInfo, session_stream);
           } catch (error) {
             console.error('Error initializing UI:', error);
             stream.write('Error loading dashboard. Check server logs.\r\n');
