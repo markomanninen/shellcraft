@@ -154,7 +154,7 @@ my-app/
 ├── vendor/ui/               # copy of @shellcraft/ui
 ├── scripts/generate-keys.js # SSH host key
 ├── keys/                    # host key (generated, git-ignored)
-└── package.json, .npmrc, .env.example
+└── package.json, .env.example
 ```
 
 A generated app is self-contained: it depends on

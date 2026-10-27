@@ -102,7 +102,7 @@ if [ "$APP_TYPE" = "ecommerce" ]; then
   mkdir -p src/models
 fi
 
-# Copy the ui package: runtime sources, README, package.json and license.
+# Copy the ui package: runtime sources, README, changelog, package.json and license.
 # Its tests, scripts and node_modules stay behind. The package.json loses
 # its devDependencies and scripts: npm links a file: path inside the project
 # and would install a linked package's devDependencies (test tools, and a
@@ -122,6 +122,9 @@ if command -v node >/dev/null 2>&1 &&
   cp "$UI_SRC/package.json" vendor/ui/package.json
 fi
 cp "$UI_SRC/README.md" vendor/ui/README.md
+if [ -f "$UI_SRC/CHANGELOG.md" ]; then
+  cp "$UI_SRC/CHANGELOG.md" vendor/ui/CHANGELOG.md
+fi
 if [ -f "$UI_SRC/LICENSE" ]; then
   cp "$UI_SRC/LICENSE" vendor/ui/LICENSE
 elif [ -f "$SCRIPT_DIR/LICENSE" ]; then
@@ -168,12 +171,11 @@ cat > package.json << 'EOL'
 EOL
 fill_placeholders package.json
 
-cat > .npmrc << 'EOL'
-# Same setting as the shellcraft apps. npm links a file: path inside the
-# project anyway (node_modules/@shellcraft/ui -> vendor/ui). vendor/ui has
-# no node_modules of its own, so it uses this app's react and ink: one React.
-install-links=true
-EOL
+# No .npmrc: npm links a file: path inside the project
+# (node_modules/@shellcraft/ui -> vendor/ui), and vendor/ui has no
+# node_modules of its own, so it uses this app's react and ink: one React.
+# (install-links=true, as the shellcraft apps use for ../ui, would make
+# `npm ls` report the link as invalid here.)
 
 # App name for the title bar
 cat > src/config.js << 'EOL'
@@ -285,39 +287,26 @@ EOL
 
 # Create authentication handler
 cat > src/server/auth.js << 'EOL'
-import ssh2 from 'ssh2';
+// Who gets in. The checks live in @shellcraft/ui/auth (vendor/ui/src/auth.js):
+//
+// - publickey: the client must prove that it holds the key (ssh2 leaves the
+//   signature check to the server). onKey(key) gets a verified key, which
+//   becomes the session's fingerprint.
+// - keyboard-interactive: accepted without prompts, an anonymous session.
+// - none, password and the rest: rejected. OpenSSH tries 'none' first;
+//   accepting it would make every user anonymous.
+//
+// For a real deployment, allow only known keys and no anonymous users:
+//
+//   const allowed = new Set(['SHA256:...']);
+//   authenticate(ctx, onKey, { anonymous: false, allowKey: (key) => allowed.has(fingerprintOf(key)) });
+import { authenticate as shellcraftAuthenticate, AUTH_METHODS, fingerprintOf } from '@shellcraft/ui/auth';
 
-const { utils } = ssh2;
+export { AUTH_METHODS, fingerprintOf };
 
-/** The methods the server offers when it rejects one. */
-export const AUTH_METHODS = ['publickey', 'keyboard-interactive'];
-
-/**
- * ssh2 'authentication' handler for a server that lets everyone in.
- *
- * - publickey: any key, but the client must prove that it holds the key
- *   (ssh2 leaves the signature check to the app). onKey(ctx.key) is called
- *   for a verified key, which becomes the session's fingerprint.
- * - keyboard-interactive: accepted without prompts: an anonymous session.
- * - none, password and the rest: rejected, offering the two methods above.
- *   OpenSSH tries 'none' first; accepting it would make every user
- *   anonymous, even one with a key.
- *
- * For a real deployment, check the key against a list of allowed keys here.
- */
+/** ssh2 'authentication' handler: everyone gets in, a key only when proven. */
 export function authenticate(ctx, onKey = () => {}) {
-  if (ctx.method === 'publickey') {
-    const key = utils.parseKey(ctx.key.data);
-    if (!key || key instanceof Error) return ctx.reject(AUTH_METHODS);
-    if (ctx.signature) {
-      if (key.verify(ctx.blob, ctx.signature, ctx.hashAlgo) !== true) return ctx.reject(AUTH_METHODS);
-      onKey(ctx.key);
-    }
-    // Without a signature the client only asks whether this key would do.
-    return ctx.accept();
-  }
-  if (ctx.method === 'keyboard-interactive') return ctx.accept();
-  return ctx.reject(AUTH_METHODS);
+  return shellcraftAuthenticate(ctx, onKey, { anonymous: true });
 }
 EOL
 
@@ -352,13 +341,11 @@ echo "👤 Creating session manager..."
 if [ "$APP_TYPE" = "ecommerce" ]; then
   cat > src/server/session.js << 'EOL'
 import { nanoid } from 'nanoid';
-import crypto from 'crypto';
+import { fingerprintOf } from '@shellcraft/ui/auth';
 
-/** OpenSSH-style fingerprint of a public key: "SHA256:..." (as ssh-keygen -l). */
-export function fingerprintOf(publicKey) {
-  if (!publicKey?.data) return 'anonymous';
-  return `SHA256:${crypto.createHash('sha256').update(publicKey.data).digest('base64').replace(/=+$/, '')}`;
-}
+// OpenSSH-style fingerprint of a public key: "SHA256:..." (as ssh-keygen -l),
+// or 'anonymous'.
+export { fingerprintOf };
 
 export class SessionManager {
   constructor() {
@@ -392,13 +379,11 @@ EOL
 else
   cat > src/server/session.js << 'EOL'
 import { nanoid } from 'nanoid';
-import crypto from 'crypto';
+import { fingerprintOf } from '@shellcraft/ui/auth';
 
-/** OpenSSH-style fingerprint of a public key: "SHA256:..." (as ssh-keygen -l). */
-export function fingerprintOf(publicKey) {
-  if (!publicKey?.data) return 'anonymous';
-  return `SHA256:${crypto.createHash('sha256').update(publicKey.data).digest('base64').replace(/=+$/, '')}`;
-}
+// OpenSSH-style fingerprint of a public key: "SHA256:..." (as ssh-keygen -l),
+// or 'anonymous'.
+export { fingerprintOf };
 
 export class SessionManager {
   constructor() {
@@ -1419,8 +1404,8 @@ cat >> README.md << 'EOL'
 
 - `src/server/index.js` accepts SSH connections and creates a session for
   each. For every shell it calls `CommandRouter.handleConnection()`.
-- `src/server/auth.js` decides who gets in. A client with a key must prove
-  that it holds the key; the session then stores the key's fingerprint
+- `src/server/auth.js` decides who gets in, with `authenticate()` from
+  `@shellcraft/ui/auth`. A client with a key must prove that it holds the key; the session then stores the key's fingerprint
   (`SHA256:...`, as `ssh-keygen -l` shows it). A client without a key signs
   in anonymously through keyboard-interactive, without prompts. The `none`
   method alone is not enough: OpenSSH tries it first, and accepting it would
@@ -1535,7 +1520,7 @@ Docker (keep the host key out of the image and mount it):
 ```dockerfile
 FROM node:24-alpine
 WORKDIR /app
-COPY package*.json .npmrc ./
+COPY package*.json ./
 COPY vendor ./vendor
 RUN npm ci --omit=dev
 COPY . .
