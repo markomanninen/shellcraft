@@ -1,122 +1,91 @@
-import { UIComponents } from './components.js';
+import React from 'react';
+import { Screen, Panel, ScrollView, Box, Text, useTerminalSize, textProps, wrapText } from '@shellcraft/ui';
+import { APP_NAME, SCROLL_HINTS, useBackKeys, gameMeta } from './components.js';
 
-export class HelpScreen {
-  constructor(context) {
-    this.context = context;
-    this.screen = context.screen;
-    this.render();
+const h = React.createElement;
+
+const KEYS = [
+  ['↑↓ ⏎', 'move and select in lists'],
+  ['1-9', 'take a suggested action at once (room), jump (menu)'],
+  ['tab', 'ask the Game Master in your own words; tab, esc or ⏎ go back'],
+  ['pgup pgdn', 'scroll the story (room)'],
+  ['i', 'inventory'],
+  ['j', 'journal'],
+  ['m', 'map in place of the status panels (room)'],
+  ['r', 'retry after the Game Master failed'],
+  ['h', 'menu'],
+  ['b esc', 'back'],
+  ['q', 'quit (ctrl-c always quits, q not while typing)']
+];
+
+const GAMEPLAY = [
+  'Deterministic rules resolve inventory, quests and faction reputation.',
+  'Combat encounters are deterministic and resolve with skill checks.',
+  'Skill checks decide the outcome: success, partial or fail.',
+  'NPCs remember your interactions and track their trust in you.',
+  'The director paces tone and tension as you play.',
+  'The Game Master (an LLM) only narrates what the rules decided.'
+];
+
+const TIPS = [
+  'Check the journal for objectives and faction standing.',
+  'Talk to NPCs to unlock better quest paths.',
+  'Defeat guardians before reaching for high-value objectives.',
+  'Use key items where they matter, especially in the temple.',
+  'Balance exploration and caution as tension rises.'
+];
+
+const KEY_WIDTH = 12;
+
+/** Help as one-row nodes: headings, wrapped paragraphs and key rows. */
+export function helpRows(width) {
+  const rows = [];
+  const heading = (text) => rows.push(h(Text, { bold: true, wrap: 'truncate-end' }, text));
+  const blank = () => rows.push(h(Text, null, ' '));
+  const paragraph = (text, indent = 2, hanging = 0) => {
+    for (const line of wrapText(' '.repeat(indent) + text, width, { hangingIndent: hanging })) {
+      rows.push(h(Text, { wrap: 'truncate-end' }, line));
+    }
+  };
+
+  heading('Objective');
+  paragraph('Earn the Elder Seal, recover the temple amulet and claim the treasure beyond the vault sentinel.');
+  blank();
+  heading('Keys');
+  for (const [keys, text] of KEYS) {
+    const lines = wrapText(text, Math.max(width - 2 - KEY_WIDTH, 1));
+    lines.forEach((line, i) => {
+      rows.push(
+        h(
+          Box,
+          { width: '100%' },
+          h(
+            Box,
+            { width: 2 + KEY_WIDTH, flexShrink: 0, paddingLeft: 2 },
+            i === 0 ? h(Text, { bold: true, ...textProps('accent') }, keys) : null
+          ),
+          h(Box, { flexGrow: 1, flexShrink: 1, overflow: 'hidden' }, h(Text, { wrap: 'truncate-end' }, line))
+        )
+      );
+    });
   }
+  blank();
+  heading('Gameplay');
+  GAMEPLAY.forEach((text) => paragraph(`- ${text}`, 2, 2));
+  blank();
+  heading('Tips');
+  TIPS.forEach((text) => paragraph(`- ${text}`, 2, 2));
+  blank();
+  heading('Good luck, adventurer!');
+  return rows;
+}
 
-  bindScrollKeys(box) {
-    this.screen.key(['up'], () => {
-      box.scroll(-1);
-      this.screen.render();
-    });
-    this.screen.key(['down'], () => {
-      box.scroll(1);
-      this.screen.render();
-    });
-    this.screen.key(['pageup'], () => {
-      box.scroll(-6);
-      this.screen.render();
-    });
-    this.screen.key(['pagedown'], () => {
-      box.scroll(6);
-      this.screen.render();
-    });
-    this.screen.key(['home'], () => {
-      box.setScroll(0);
-      this.screen.render();
-    });
-    this.screen.key(['end'], () => {
-      box.setScrollPerc(100);
-      this.screen.render();
-    });
-  }
-
-  renderFooter() {
-    UIComponents.createBox({
-      parent: this.screen,
-      bottom: 0,
-      left: 0,
-      width: '100%',
-      height: 3,
-      content: '{center}{gray-fg}up/down, pgup/pgdn to scroll | b=back | q=quit{/}',
-      tags: true
-    });
-
-    this.screen.key(['b', 'escape'], () => {
-      this.context.navigate('game');
-    });
-  }
-
-  render() {
-    const contentTop = 4;
-    const footerHeight = 3;
-    const contentHeight = Math.max(8, this.screen.height - contentTop - footerHeight);
-
-    UIComponents.createBox({
-      parent: this.screen,
-      top: 0,
-      left: 0,
-      width: '100%',
-      height: 3,
-      content: '{center}{bold}{cyan-fg}HELP{/}',
-      tags: true
-    });
-
-    const helpText = UIComponents.createBox({
-      parent: this.screen,
-      top: contentTop,
-      left: 'center',
-      width: '80%',
-      height: contentHeight,
-      label: ' How to Play ',
-      content: `
-  {bold}OBJECTIVE:{/}
-  Explore the world, collect items, and find the treasure!
-
-  {bold}CONTROLS:{/}
-  Up/Down      - Navigate menus
-  Enter        - Select option
-  1-9          - Quick-select menu/action entries
-  h            - Return to main menu (from room)
-  i            - View inventory (from room)
-  j            - View journal (from room)
-  q / Ctrl+C   - Quit game
-
-  {bold}GAMEPLAY:{/}
-  - Deterministic rules resolve inventory, quests, and faction reputation
-  - Combat encounters are deterministic and resolve with skill checks
-  - Skill checks affect action outcomes (success / partial / fail)
-  - NPCs track trust and memory based on your interactions
-  - Director pacing adapts tone and tension as you play
-  - Room HUD now surfaces HP/tension meters and active objective context
-  - Screen routing uses short animated transitions between views
-
-  {bold}TIPS:{/}
-  - Check your journal for active objectives and faction standing
-  - Talk to NPCs to unlock better quest paths
-  - Defeat guardians before attempting high-value objective pickups
-  - Use key items in meaningful locations (especially the temple)
-  - Balance exploration and caution as tension rises
-
-  {bold}GOOD LUCK, ADVENTURER!{/}
-`,
-      tags: true,
-      keys: true,
-      vi: true,
-      mouse: true,
-      scrollable: true,
-      alwaysScroll: true,
-      scrollbar: {
-        ch: ' ',
-        style: { bg: 'cyan' }
-      }
-    });
-
-    this.bindScrollKeys(helpText);
-    this.renderFooter();
-    helpText.focus();
-  }
+export function HelpScreen({ ctx }) {
+  const { columns } = useTerminalSize();
+  useBackKeys(ctx);
+  return h(
+    Screen,
+    { app: APP_NAME, screen: 'Help', meta: gameMeta(ctx.session.gameState), hints: SCROLL_HINTS, message: ctx.message },
+    h(Panel, { title: 'How to play', focused: true }, h(ScrollView, { rows: helpRows(Math.max(columns - 4, 10)) }))
+  );
 }
