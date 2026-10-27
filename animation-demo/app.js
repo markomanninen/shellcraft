@@ -1,8 +1,6 @@
 import React, { useReducer, useRef } from 'react';
-// @shellcraft/ui does not re-export useAnimation; ink is the same instance
-// (one copy in node_modules, `npm ls ink`).
-import { useAnimation } from 'ink';
 import {
+  useAnimation,
   Screen,
   Panel,
   SelectList,

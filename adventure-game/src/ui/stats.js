@@ -1,8 +1,8 @@
 import React from 'react';
-import { Screen, Panel, ScrollView, Box, Text, useTerminalSize, textProps } from '@shellcraft/ui';
+import { Screen, Panel, ScrollView, Box, Text, InfoRow, useTerminalSize, textProps } from '@shellcraft/ui';
 import { GAME_CONFIG } from '../config/game-config.js';
 import { GameModel } from '../models/game.js';
-import { APP_NAME, NoGame, InfoRow, BACK_HINTS, SCROLL_HINTS, useBackKeys, gameMeta } from './components.js';
+import { APP_NAME, NoGame, BACK_HINTS, SCROLL_HINTS, useBackKeys, gameMeta } from './components.js';
 
 const h = React.createElement;
 const gameModel = new GameModel();

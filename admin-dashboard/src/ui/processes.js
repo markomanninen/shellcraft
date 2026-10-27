@@ -1,6 +1,6 @@
 import React from 'react';
-import { Panel, Table, EmptyState, useTerminalSize } from '@shellcraft/ui';
-import { AdminScreen, loadMessage, screenHints, useData, useScreenKeys } from './parts.js';
+import { Panel, Table, EmptyState, useTerminalSize, useData } from '@shellcraft/ui';
+import { AdminScreen, loadMessage, screenHints, useScreenKeys } from './parts.js';
 import { PROCESS_COLUMNS, parseProcesses, processRows, shortCommand } from './tables.js';
 
 const h = React.createElement;

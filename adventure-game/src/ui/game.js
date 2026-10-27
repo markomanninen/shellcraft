@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Screen, Panel, SelectList, EmptyState, Meter, Box } from '@shellcraft/ui';
+import { Screen, Panel, SelectList, EmptyState, Meter, Box, InfoRow, BlankRow } from '@shellcraft/ui';
 import { GAME_CONFIG } from '../config/game-config.js';
-import { APP_NAME, InfoRow, Blank, gameMeta, plural } from './components.js';
+import { APP_NAME, gameMeta, plural } from './components.js';
 import { objectiveText, healthTone, tensionTone } from './turn.js';
 
 const h = React.createElement;
@@ -40,7 +40,7 @@ function Campaign({ gameState }) {
       value: gameState.inventory.length ? plural(gameState.inventory.length, 'item') : 'empty',
       tone: gameState.inventory.length ? 'default' : 'muted'
     }),
-    h(Blank),
+    h(BlankRow),
     h(Meter, { label: 'HP', value: health, max: maxHealth, display: `${health}/${maxHealth}`, tone: healthTone(health, maxHealth) }),
     h(Meter, { label: 'Tension', value: tension, max: maxTension, display: `${tension}/${maxTension}`, tone: tensionTone(tension, maxTension) })
   );

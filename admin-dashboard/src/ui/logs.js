@@ -1,6 +1,6 @@
 import React from 'react';
-import { Box, Panel, ScrollView, useInterval, useTerminalSize } from '@shellcraft/ui';
-import { AdminScreen, Blank, infoRows, screenHints, useScreenKeys, SUMMARY_LABEL_WIDTH } from './parts.js';
+import { Box, Panel, ScrollView, useInterval, useTerminalSize, BlankRow, infoRows } from '@shellcraft/ui';
+import { AdminScreen, screenHints, useScreenKeys, SUMMARY_LABEL_WIDTH } from './parts.js';
 
 const h = React.createElement;
 
@@ -32,7 +32,7 @@ export function LogsSummary({ ctx }) {
       ['Errors', String(errors), errors > 0 ? 'danger' : 'default'],
       ['Warnings', String(warnings), warnings > 0 ? 'warning' : 'default']
     ], SUMMARY_LABEL_WIDTH),
-    h(Blank),
+    h(BlankRow),
     h(ScrollView, { lines: logLines(logs), follow: true, isActive: false })
   );
 }

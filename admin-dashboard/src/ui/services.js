@@ -1,6 +1,6 @@
 import React from 'react';
-import { Box, Text, Panel, Table, ScrollView, EmptyState, useTerminalSize } from '@shellcraft/ui';
-import { AdminScreen, Blank, infoRows, loadMessage, screenHints, useData, useScreenKeys, SUMMARY_LABEL_WIDTH } from './parts.js';
+import { Box, Text, Panel, Table, ScrollView, EmptyState, useTerminalSize, BlankRow, infoRows, useData } from '@shellcraft/ui';
+import { AdminScreen, loadMessage, screenHints, useScreenKeys, SUMMARY_LABEL_WIDTH } from './parts.js';
 import { parseServices } from './tables.js';
 
 const h = React.createElement;
@@ -29,7 +29,7 @@ export function ServicesSummary({ ctx }) {
       ['Listed', `${services.rows.length} services`],
       ['Manager', services.manager]
     ], SUMMARY_LABEL_WIDTH),
-    h(Blank),
+    h(BlankRow),
     h(ScrollView, {
       rows: services.names.map((name) => h(Text, { wrap: 'truncate-end' }, name)),
       isActive: false

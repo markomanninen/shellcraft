@@ -1,6 +1,6 @@
 import React from 'react';
-import { Box, Panel, Table, ScrollView, EmptyState, useTerminalSize } from '@shellcraft/ui';
-import { AdminScreen, Blank, InfoRow, infoRows, screenHints, useData, useScreenKeys, SUMMARY_LABEL_WIDTH } from './parts.js';
+import { Box, Panel, Table, ScrollView, EmptyState, useTerminalSize, BlankRow, InfoRow, infoRows, useData } from '@shellcraft/ui';
+import { AdminScreen, screenHints, useScreenKeys, SUMMARY_LABEL_WIDTH } from './parts.js';
 import { NETWORK_COLUMNS, networkRows } from './tables.js';
 
 const h = React.createElement;
@@ -20,7 +20,7 @@ export function NetworkSummary({ ctx }) {
       ['Interfaces', String(names.size)],
       ['Addresses', String(interfaces.length)]
     ], SUMMARY_LABEL_WIDTH),
-    h(Blank),
+    h(BlankRow),
     h(ScrollView, {
       rows: interfaces
         .filter(isIPv4)

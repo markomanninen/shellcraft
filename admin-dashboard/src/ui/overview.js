@@ -1,8 +1,6 @@
 import React from 'react';
-import { Box, Panel, Meter } from '@shellcraft/ui';
-import {
-  AdminScreen, Blank, infoRows, meterTone, screenHints, useData, useScreenKeys, SUMMARY_LABEL_WIDTH
-} from './parts.js';
+import { Box, Panel, Meter, BlankRow, infoRows, useData } from '@shellcraft/ui';
+import { AdminScreen, meterTone, screenHints, useScreenKeys, SUMMARY_LABEL_WIDTH, LABEL_WIDTH } from './parts.js';
 
 const h = React.createElement;
 
@@ -39,7 +37,7 @@ export function OverviewSummary({ ctx }) {
       ['Uptime', info.uptime],
       ['Load', info.loadAvg.join('  ')]
     ], SUMMARY_LABEL_WIDTH),
-    h(Blank),
+    h(BlankRow),
     h(UsageMeters, { cpu, memory })
   );
 }
@@ -70,8 +68,8 @@ export function OverviewScreen({ ctx }) {
         ['Total memory', memory.total],
         ['Used memory', memory.used],
         ['Free memory', memory.free]
-      ]),
-      h(Blank),
+      ], LABEL_WIDTH),
+      h(BlankRow),
       h(UsageMeters, { cpu, memory })
     )
   );

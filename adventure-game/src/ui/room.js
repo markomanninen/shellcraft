@@ -3,11 +3,12 @@ import {
   Screen,
   Panel,
   SelectList,
-  ListItem,
   TextField,
   ScrollView,
   Meter,
   EmptyState,
+  InfoRow,
+  BlankRow,
   Box,
   Text,
   useInput,
@@ -15,19 +16,7 @@ import {
   textProps
 } from '@shellcraft/ui';
 import { GAME_CONFIG } from '../config/game-config.js';
-import {
-  APP_NAME,
-  InfoRow,
-  Blank,
-  LogView,
-  NoGame,
-  BACK_HINTS,
-  gameMeta,
-  maxScrollOffset,
-  wrappedRowCount,
-  fitText,
-  hintsWidth
-} from './components.js';
+import { APP_NAME, NoGame, BACK_HINTS, gameMeta, logLines } from './components.js';
 import { MapView } from './map-view.js';
 import {
   storyOf,
@@ -77,7 +66,7 @@ function StatusPanel({ status, height }) {
       display: `${director.tension}/${maxTension}`,
       tone: tensionTone(director.tension, maxTension)
     }),
-    h(Blank),
+    h(BlankRow),
     h(
       Box,
       { flexDirection: 'column', paddingLeft: 1 },
@@ -101,17 +90,6 @@ function StatusPanel({ status, height }) {
   );
 }
 
-/** Action rows without a selection: while waiting, or while typing. */
-function StaticActions({ items, disabled, height }) {
-  return h(
-    Box,
-    { flexDirection: 'column', flexShrink: 0, width: '100%' },
-    ...items.slice(0, height).map((item, i) =>
-      h(ListItem, { key: `${i}`, label: item.label, hint: item.hint, disabled, selected: false })
-    )
-  );
-}
-
 /**
  * The room (Split template): narrative top left, status top right, the
  * suggested actions with a free-text prompt bottom left (focused), the
@@ -120,7 +98,7 @@ function StaticActions({ items, disabled, height }) {
  * Focus: the action list or the free-text field, never both. Tab (or /)
  * goes to the field; tab, esc or ⏎ come back. While the Game Master is
  * thinking the actions are muted and take no keys; i, j, m, h and q still
- * work. PgUp/PgDn scroll the story.
+ * work. PgUp/PgDn (Home/End) scroll the story; ↑↓ stay with the actions.
  */
 export function RoomScreen({ ctx }) {
   const gameState = ctx.session.gameState;
@@ -130,7 +108,6 @@ export function RoomScreen({ ctx }) {
   const [draft, setDraft] = useState('');
   const [selected, setSelected] = useState(0);
   const [showMap, setShowMap] = useState(false);
-  const [scroll, setScroll] = useState(null); // null: follow the end
 
   const { busy, turnError } = ctx;
   const pending = needsTurn(gameState);
@@ -144,9 +121,9 @@ export function RoomScreen({ ctx }) {
   const story = storyOf(gameState);
   const last = story.at(-1);
   const storyKey = last ? `${last.turn}:${story.length}` : '';
-  // A new turn: back to the end of the story and the first action.
+  // A new turn: the first action. (The story view is keyed by the turn, so
+  // it starts again at the end.)
   useEffect(() => {
-    setScroll(null);
     setSelected(0);
   }, [storyKey, gameState]);
 
@@ -181,23 +158,11 @@ export function RoomScreen({ ctx }) {
 
   const storyWidth = Math.max(layout.left - 4, 1);
   const storyHeight = Math.max(layout.top - 2, 1);
-  const maxOffset = maxScrollOffset(wrappedRowCount(lines, storyWidth), storyHeight);
-  const offset = scroll === null ? maxOffset : Math.min(scroll, maxOffset);
-  const page = Math.max(storyHeight - 2, 1);
 
   useInput((input, key) => {
     if (asking) {
       // The field takes the text; tab leaves it with the draft kept.
       if (key.tab) toActions();
-      return;
-    }
-    if (key.pageUp) {
-      setScroll(Math.max(offset - page, 0));
-      return;
-    }
-    if (key.pageDown) {
-      const next = offset + page;
-      setScroll(next >= maxOffset ? null : next);
       return;
     }
     if (gameOver && key.return) {
@@ -254,9 +219,8 @@ export function RoomScreen({ ctx }) {
 
   let message = ctx.message;
   if (turnError && !busy) {
-    // Fit the error next to the hints: padding 2, gap 2, glyph + space 2.
-    const space = Math.max(columns - 6 - hintsWidth(hints), 12);
-    message = { tone: 'error', text: fitText(`The Game Master failed: ${turnError}`, space) };
+    // The status bar shortens it to fit next to the hints.
+    message = { tone: 'error', text: `The Game Master failed: ${turnError}` };
   } else if (gameOver && !message) {
     message = { tone: 'success', text: 'Victory! Quest complete' };
   }
@@ -283,7 +247,12 @@ export function RoomScreen({ ctx }) {
       height: listHeight
     });
   } else {
-    actionsBody = h(StaticActions, { items, disabled: !canAct, height: listHeight });
+    // No selection bar while waiting or typing; muted while waiting.
+    actionsBody = h(SelectList, {
+      items: items.map((item) => ({ ...item, disabled: !canAct })),
+      focused: false,
+      height: listHeight
+    });
   }
 
   const actionsPanel = h(
@@ -326,10 +295,12 @@ export function RoomScreen({ ctx }) {
         h(
           Panel,
           { title: 'Journal' },
-          h(LogView, {
-            entries: journalEntries(story),
+          h(ScrollView, {
+            lines: logLines(journalEntries(story)),
             width: Math.max(layout.right - 4, 1),
-            height: Math.max(layout.bottom - 4, 1)
+            height: Math.max(layout.bottom - 4, 1),
+            follow: true,
+            isActive: false
           })
         )
       );
@@ -347,12 +318,13 @@ export function RoomScreen({ ctx }) {
           Panel,
           { title: status.roomName, height: layout.top, paddingY: 0 },
           h(ScrollView, {
+            key: storyKey,
             lines,
             width: storyWidth,
             height: storyHeight,
-            offset,
-            onOffsetChange: setScroll,
-            isActive: false
+            follow: true,
+            keys: 'page',
+            isActive: !asking
           })
         ),
         actionsPanel

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Box, Panel, useTerminalSize } from '@shellcraft/ui';
-import { AdminScreen, infoRows, screenHints, useScreenKeys, SUMMARY_LABEL_WIDTH } from './parts.js';
+import { Box, Panel, useTerminalSize, infoRows } from '@shellcraft/ui';
+import { AdminScreen, screenHints, useScreenKeys, SUMMARY_LABEL_WIDTH, LABEL_WIDTH } from './parts.js';
 
 const h = React.createElement;
 
@@ -63,7 +63,7 @@ export function SettingsScreen({ ctx }) {
         ['Fingerprint', session.fingerprint],
         ['Connected', formatDateTime(session.createdAt)],
         ['Screen size', `${columns}×${rows}`]
-      ])
+      ], LABEL_WIDTH)
     )
   );
 }

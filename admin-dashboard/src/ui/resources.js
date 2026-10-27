@@ -1,9 +1,6 @@
 import React from 'react';
-import { Box, Panel, Meter, ScrollView, METER_WIDTH, useTerminalSize } from '@shellcraft/ui';
-import {
-  AdminScreen, Blank, InfoRow, infoRows, meterTone, screenHints, useData, useScreenKeys,
-  SUMMARY_LABEL_WIDTH
-} from './parts.js';
+import { Box, Panel, Meter, ScrollView, METER_WIDTH, useTerminalSize, BlankRow, InfoRow, infoRows, useData } from '@shellcraft/ui';
+import { AdminScreen, meterTone, screenHints, useScreenKeys, SUMMARY_LABEL_WIDTH, LABEL_WIDTH } from './parts.js';
 
 const h = React.createElement;
 
@@ -50,10 +47,10 @@ export function ResourcesSummary({ ctx }) {
       ['Cores', String(cores.length)],
       ['Memory', `${memory.used} of ${memory.total}`]
     ], SUMMARY_LABEL_WIDTH),
-    h(Blank),
+    h(BlankRow),
     h(Meter, { label: 'CPU', value: cpu, tone: meterTone(cpu) }),
     h(Meter, { label: 'Memory', value: memory.usedPercent, tone: meterTone(memory.usedPercent) }),
-    h(Blank),
+    h(BlankRow),
     h(ScrollView, { rows: coreMeterRows(cores, 1), isActive: false })
   );
 }
@@ -76,16 +73,16 @@ export function ResourcesScreen({ ctx }) {
   const perRow = Math.max(Math.floor((width + METER_GAP) / (METER_WIDTH + METER_GAP)), 1);
 
   const content = [
-    h(InfoRow, { key: 'model', label: 'Model', value: cpuModels(cores) }),
-    h(InfoRow, { key: 'cores', label: 'Cores', value: String(cores.length) }),
-    h(Blank, { key: 'b1' }),
+    h(InfoRow, { key: 'model', label: 'Model', value: cpuModels(cores), labelWidth: LABEL_WIDTH }),
+    h(InfoRow, { key: 'cores', label: 'Cores', value: String(cores.length), labelWidth: LABEL_WIDTH }),
+    h(BlankRow, { key: 'b1' }),
     h(Meter, { key: 'cpu', label: 'CPU', value: cpu, tone: meterTone(cpu) }),
     ...coreMeterRows(cores, perRow),
-    h(Blank, { key: 'b2' }),
+    h(BlankRow, { key: 'b2' }),
     h(Meter, { key: 'memory', label: 'Memory', value: memory.usedPercent, tone: meterTone(memory.usedPercent) }),
-    h(InfoRow, { key: 'total', label: 'Total', value: memory.total }),
-    h(InfoRow, { key: 'used', label: 'Used', value: memory.used }),
-    h(InfoRow, { key: 'free', label: 'Free', value: memory.free })
+    h(InfoRow, { key: 'total', label: 'Total', value: memory.total, labelWidth: LABEL_WIDTH }),
+    h(InfoRow, { key: 'used', label: 'Used', value: memory.used, labelWidth: LABEL_WIDTH }),
+    h(InfoRow, { key: 'free', label: 'Free', value: memory.free, labelWidth: LABEL_WIDTH })
   ];
 
   return h(
