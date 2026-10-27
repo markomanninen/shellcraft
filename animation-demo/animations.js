@@ -1,15 +1,17 @@
 // ============================================================
 // ASCII Animation Frames
-// Each animation is an object with: name, interval (ms), frames
+// Each animation is an object with: name, interval (ms), tone, frames.
+// tone is a @shellcraft/ui text token (accent, success, warning, default):
+// the theme names the colors, so the frames never spell one out.
 // ============================================================
 
-export const animations = [
+const source = [
 
   // 1. Crystal Ball - swirling mystic orb
   {
     name: 'Crystal Ball',
     interval: 350,
-    color: 'cyan',
+    tone: 'accent',
     frames: [
       [
         '       .\'\'\'\'\'\'\'`.       ',
@@ -82,7 +84,7 @@ export const animations = [
   {
     name: 'Bubbling Cauldron',
     interval: 400,
-    color: 'green',
+    tone: 'success',
     frames: [
       [
         '                       ',
@@ -161,7 +163,7 @@ export const animations = [
   {
     name: 'Hourglass',
     interval: 500,
-    color: 'yellow',
+    tone: 'warning',
     frames: [
       // Frame 1: Full top, empty bottom
       [
@@ -314,7 +316,7 @@ export const animations = [
   {
     name: 'Atom Orbit',
     interval: 150,
-    color: 'white',
+    tone: 'default',
     frames: [
       // Frame 1: electron at top
       [
@@ -419,7 +421,7 @@ export const animations = [
   {
     name: 'Wizard Casting',
     interval: 500,
-    color: 'blue',
+    tone: 'accent', // was blue (no blue in the theme)
     frames: [
       [
         '                *        ',
@@ -480,7 +482,7 @@ export const animations = [
   {
     name: 'DNA Helix',
     interval: 200,
-    color: 'magenta',
+    tone: 'default', // was magenta (no magenta in the theme)
     frames: [
       [
         '   ()---()   ',
@@ -580,7 +582,7 @@ export const animations = [
   {
     name: 'Watson Orb',
     interval: 200,
-    color: 'cyan',
+    tone: 'accent',
     frames: [
       [
         '                     ',
@@ -658,3 +660,21 @@ export const animations = [
   },
 
 ];
+
+/**
+ * Pad every line of an animation to its widest line and every frame to its
+ * tallest frame, so the art keeps its place when centered and does not
+ * jump from frame to frame.
+ */
+export function normalize(animation) {
+  const width = Math.max(...animation.frames.flat().map((line) => line.length));
+  const height = Math.max(...animation.frames.map((frame) => frame.length));
+  const frames = animation.frames.map((frame) => {
+    const lines = frame.map((line) => line.padEnd(width));
+    while (lines.length < height) lines.push(' '.repeat(width));
+    return lines;
+  });
+  return Object.freeze({ ...animation, width, height, frames });
+}
+
+export const animations = Object.freeze(source.map(normalize));
