@@ -54,6 +54,17 @@ export function AdventureApp({ session, saveGame = () => {}, llm, rules, initial
     // a game handed in some other way. Once, so a turn in flight keeps
     // writing to the same object.
     if (session.gameState) session.gameState = normalizeGameState(session.gameState);
+    // A saved response the room cannot render is dropped (as before the
+    // port); the room then runs a fresh turn.
+    const last = session.gameState?.lastResponse;
+    if (last) {
+      try {
+        validateRenderableResponse(last);
+      } catch (error) {
+        console.error(`[adventure] Dropping the saved turn: ${error.message}`);
+        delete session.gameState.lastResponse;
+      }
+    }
     return null;
   });
   const [route, setRoute] = useState({ name: screens[initialScreen] ? initialScreen : 'game', from: 'game', visit: 0 });

@@ -68,7 +68,11 @@ function assertScreen(t, columns, rows, screen, { focused = 1 } = {}) {
   assert.ok(lines[1].startsWith('╭─ '), `row 1: "${lines[1]}"`);
   assert.ok(lines[rows - 2].startsWith('╰'), `row ${rows - 2}: "${lines[rows - 2]}"`);
   const raw = t.lastFrame();
-  assert.equal(boldDimText(raw), '', `${screen}: nothing is bold and dim at once`);
+  // Every frame drawn since the last check, not only the last one.
+  for (let i = t.checkedFrames ?? 0; i < t.frames.length; i++) {
+    assert.equal(boldDimText(t.frames[i]), '', `${screen}: frame ${i} has nothing bold and dim at once`);
+  }
+  t.checkedFrames = t.frames.length;
   assert.equal(focusedPanels(raw), focused, `${screen}: ${focused} focused panel(s)`);
   return lines;
 }
@@ -394,6 +398,28 @@ describe('Adventure screens (80x24)', () => {
     assertScreen(t, 80, 24, 'Village Square');
     assert.ok(t.text().includes('Lanterns sway over the village square.'));
     assert.equal(llm.calls.length, 0);
+  });
+
+  it('a saved turn the room cannot render is dropped and replayed', async () => {
+    const gameState = createInitialGameState();
+    gameState.isFirstTurn = false;
+    gameState.moves = 3;
+    gameState.lastResponse = { room_name: 'Village Square', description: 'Half a response.' };
+    const error = console.error;
+    console.error = () => {};
+    try {
+      const { t, llm, session } = open({ gameState });
+      await tick(20);
+      assert.equal(session.gameState.lastResponse, undefined);
+      await t.press('enter'); // Continue adventure
+      await tick(40);
+      assertScreen(t, 80, 24, 'Village Square');
+      assert.equal(llm.calls.length, 1);
+      assert.equal(llm.calls[0].action_text, 'Investigate surroundings');
+      assert.ok(statusRow(t).startsWith(' 1-'), statusRow(t));
+    } finally {
+      console.error = error;
+    }
   });
 
   it('q quits from the room', async () => {
