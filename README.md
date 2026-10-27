@@ -121,7 +121,8 @@ Each app runs on port 2222 by default (configurable via `SSH_PORT` in `.env`).
 shellcraft/
 ├── init.sh                  # Template generator script
 ├── quick-start.sh           # One-liner setup helper
-├── demo-shop/               # E-commerce demo app
+├── ui/                      # @shellcraft/ui: shared Ink components + SSH adapter
+├── demo-shop/               # E-commerce demo app (Ink, uses ui/)
 ├── adventure-game/          # Text RPG with LLM integration
 ├── admin-dashboard/         # System monitoring dashboard
 ├── animation-demo/          # ASCII animation showcase
@@ -159,7 +160,8 @@ my-app/
 ## Technology Stack
 
 - **[ssh2](https://github.com/mscdex/ssh2)** -- SSH server implementation
-- **[blessed](https://github.com/chjj/blessed)** -- Terminal UI framework
+- **[Ink](https://github.com/vadimdemedes/ink)** -- React for the terminal, through the shared [`ui/`](ui/README.md) package (demo-shop; the other apps are being moved over)
+- **[blessed](https://github.com/chjj/blessed)** -- Terminal UI framework (admin-dashboard, adventure-game, animation-demo, generated apps)
 - **[dotenv](https://github.com/motdotla/dotenv)** -- Environment configuration
 - **[nanoid](https://github.com/ai/nanoid)** -- Unique ID generation
 

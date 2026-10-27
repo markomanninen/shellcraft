@@ -87,4 +87,54 @@ describe('SSH Server E2E', () => {
       tryKeyboard: false
     });
   });
+
+  it('should render the shop in a pty, resize, and quit on q', (t, done) => {
+    const conn = new Client();
+    let output = '';
+    let step = 'home';
+    const plain = () => output.replace(/\u001B\[[0-?]*[ -/]*[@-~]/g, '');
+    const fail = (err) => {
+      conn.end();
+      done(err);
+    };
+
+    conn.on('ready', () => {
+      conn.shell({ cols: 80, rows: 24, term: 'xterm-256color' }, (err, stream) => {
+        if (err) return fail(err);
+        let exitCode = null;
+        stream.on('exit', (code) => { exitCode = code; });
+        stream.on('data', (data) => {
+          output += data.toString();
+          if (step === 'home' && plain().includes('Demo Shop › Home')) {
+            step = 'resize';
+            output = '';
+            stream.setWindow(30, 100, 0, 0);
+          } else if (step === 'resize' && plain().split('\r\n').length >= 30) {
+            step = 'quit';
+            stream.write('q');
+          }
+        });
+        stream.on('close', () => {
+          try {
+            assert.equal(step, 'quit', 'went through home and resize');
+            assert.ok(output.includes('\u001B[?1049l'), 'left the alternate screen');
+            assert.equal(exitCode, 0);
+            conn.end();
+            done();
+          } catch (e) {
+            fail(e);
+          }
+        });
+      });
+    });
+
+    conn.on('error', fail);
+
+    conn.connect({
+      host: 'localhost',
+      port: TEST_PORT,
+      username: 'test',
+      tryKeyboard: false
+    });
+  });
 });

@@ -1,101 +1,53 @@
-import blessed from 'blessed';
-import { UIComponents } from './components.js';
-import { ProductModel } from '../models/product.js';
+import React, { useState } from 'react';
+import { Screen, Panel, Table, useInput, useTerminalSize } from '@shellcraft/ui';
+import { cartMeta, money } from './cart-summary.js';
 
-export class ProductsScreen {
-  constructor(context) {
-    this.context = context;
-    this.screen = context.screen;
-    this.productModel = new ProductModel();
-    this.render();
-  }
+const h = React.createElement;
 
-  render() {
-    // Header
-    UIComponents.createBox({
-      parent: this.screen,
-      top: 0,
-      left: 0,
-      width: '100%',
-      height: 3,
-      content: '{center}{bold}{cyan-fg}PRODUCTS{/}',
-      tags: true,
-      border: { type: 'line' },
-      style: { border: { fg: 'cyan' } }
-    });
+export const PRODUCT_COLUMNS = [
+  { label: 'ID', width: 10 },
+  { label: 'Name', width: 24 },
+  { label: 'Description', width: 30, grow: true },
+  { label: 'Price', width: 9, align: 'right' }
+];
 
-    const products = this.productModel.getAll();
-    
-    // Container with border
-    const container = blessed.box({
-      parent: this.screen,
-      top: 4,
-      left: 2,
-      right: 2,
-      bottom: 3,
-      label: ' Available Products ',
-      border: { type: 'line' },
-      style: { border: { fg: 'cyan' } }
-    });
+/** Table template: ↑↓ move, a add to cart, c cart, b back. */
+export function ProductsScreen({ ctx }) {
+  const products = ctx.products.getAll();
+  const [index, setIndex] = useState(0);
+  const { rows } = useTerminalSize();
 
-    // Header row
-    blessed.text({
-      parent: container,
-      top: 0,
-      left: 1,
-      right: 1,
-      height: 1,
-      content: 'ID         Name                   Description                    Price',
-      style: { fg: 'yellow', bold: true }
-    });
+  useInput((input, key) => {
+    if (input === 'a') {
+      const product = products[index];
+      if (product) ctx.addToCart(product);
+    } else if (input === 'c') {
+      ctx.navigate('cart');
+    } else if (input === 'b' || key.escape) {
+      ctx.navigate('home');
+    }
+  });
 
-    // Product items as list
-    const items = products.map(p => {
-      return `${p.id.padEnd(10)} ${p.name.padEnd(22)} ${p.description.padEnd(30)} $${p.price.toFixed(2)}`;
-    });
-
-    const list = blessed.list({
-      parent: container,
-      top: 1,
-      left: 1,
-      right: 1,
-      bottom: 1,
-      items: items,
-      keys: true,
-      vi: true,
-      mouse: true,
-      style: {
-        item: { fg: 'white' },
-        selected: { fg: 'black', bg: 'white', bold: true }
-      }
-    });
-
-    // Footer
-    UIComponents.createBox({
-      parent: this.screen,
-      bottom: 0,
-      left: 0,
-      width: '100%',
-      height: 1,
-      content: '{center}{gray-fg}[A] Add to Cart | [B] Back | Use arrows to select{/}',
-      tags: true
-    });
-
-    // Key handlers
-    this.screen.key(['a'], () => {
-      const index = list.selected;
-      if (index >= 0) {
-        const product = products[index];
-        this.context.session.cart.push(product);
-        UIComponents.showMessage(this.screen, `Added ${product.name} to cart!`, 'success');
-      }
-    });
-
-    this.screen.key(['b', 'escape'], () => {
-      this.context.navigate('home');
-    });
-
-    list.focus();
-    this.screen.render();
-  }
+  return h(
+    Screen,
+    {
+      app: 'Demo Shop',
+      screen: 'Products',
+      meta: cartMeta(ctx.session.cart),
+      hints: [['↑↓', 'move'], ['a', 'add to cart'], ['c', 'cart'], ['b', 'back']],
+      message: ctx.message
+    },
+    h(
+      Panel,
+      { title: 'Products', focused: true, padding: 0 },
+      h(Table, {
+        columns: PRODUCT_COLUMNS,
+        rows: products.map((p) => [p.id, p.name, p.description, money(p.price)]),
+        selectedIndex: index,
+        onChange: setIndex,
+        // title, top edge, header, bottom edge, status
+        height: Math.max(rows - 5, 1)
+      })
+    )
+  );
 }

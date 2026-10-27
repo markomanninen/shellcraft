@@ -56,9 +56,9 @@ class TerminalServer {
         session_stream.once('shell', (accept) => {
           const stream = accept();
           
-          // Initialize UI
-          this.router.handleConnection(stream, session, ptyInfo);
-          
+          // Initialize UI (session_stream carries 'window-change' resizes)
+          this.router.handleConnection(stream, session, ptyInfo, session_stream);
+
           stream.on('error', (err) => {
             console.error('Stream error:', err);
           });
