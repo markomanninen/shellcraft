@@ -11,9 +11,11 @@ framework to install.
 | demo apps | models, sessions, screens, SSH adapter (`test/unit/`); the real SSH server and workflows (`test/e2e/`) | `./npmw test` |
 | generated apps | the same layers, created by `init.sh` | `npm test` |
 
-CI (`.github/workflows/test.yml`) runs `npm ci` and `npm test` on Node 24 for
-`ui`, `demo-shop`, `admin-dashboard`, `adventure-game` and `animation-demo`.
-For the SSH apps it runs `npm run generate-keys` first.
+CI (`.github/workflows/ci.yml`) runs `npm ci`, `npm test` and `npm audit` on
+Node 24 for each of `ui`, `demo-shop`, `admin-dashboard`, `adventure-game` and
+`animation-demo` that a pull request changes, and for all of them when `ui/`
+changes (every app uses it) and in the weekly run. For the SSH apps it runs
+`npm run generate-keys` first.
 
 ## The Layers
 
