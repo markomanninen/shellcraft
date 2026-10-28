@@ -158,9 +158,9 @@ cat > package.json << 'EOL'
   "license": "MIT",
   "dependencies": {
     "@shellcraft/ui": "file:./vendor/ui",
-    "dotenv": "^17.3.1",
+    "dotenv": "^18.0.9",
     "ink": "^8.0.0",
-    "nanoid": "^5.0.4",
+    "nanoid": "^6.0.2",
     "react": "^19.3.1",
     "ssh2": "^1.15.0"
   },
