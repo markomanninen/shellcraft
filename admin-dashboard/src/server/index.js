@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import ssh2 from 'ssh2';
 import dotenv from 'dotenv';
+import { authenticate } from '@shellcraft/ui/auth';
 
 const { Server } = ssh2;
 import { CommandRouter } from './router.js';
@@ -27,16 +28,13 @@ class TerminalServer {
     
     let publicKey = null;
     
+    // A client with a key must prove it holds the key; one without signs in
+    // anonymously through keyboard-interactive (no prompts). 'none' is
+    // turned away, so OpenSSH offers its keys. See @shellcraft/ui/auth.
     client.on('authentication', (ctx) => {
-      if (ctx.method === 'publickey') {
-        publicKey = ctx.key;
-        ctx.accept();
-      } else if (ctx.method === 'none') {
-        // Allow anonymous access
-        ctx.accept();
-      } else {
-        ctx.reject();
-      }
+      authenticate(ctx, (key) => {
+        publicKey = key;
+      });
     });
 
     client.on('ready', () => {
@@ -57,10 +55,8 @@ class TerminalServer {
           const stream = accept();
           
           try {
-            // Initialize UI
-            console.log('Initializing UI...');
-            this.router.handleConnection(stream, session, ptyInfo);
-            console.log('UI initialized successfully');
+            // Initialize UI (session_stream carries 'window-change' resizes)
+            this.router.handleConnection(stream, session, ptyInfo, session_stream);
           } catch (error) {
             console.error('Error initializing UI:', error);
             stream.write('Error loading dashboard. Check server logs.\r\n');

@@ -1,708 +1,335 @@
-import { UIComponents } from './components.js';
-import { LLMGameEngine } from '../llm/game-engine.js';
-import { RulesEngine } from '../models/rules-engine.js';
-import { normalizeGameState } from '../models/game-state.js';
+import React, { useEffect, useState } from 'react';
+import {
+  Screen,
+  Panel,
+  SelectList,
+  TextField,
+  ScrollView,
+  Meter,
+  EmptyState,
+  InfoRow,
+  BlankRow,
+  Box,
+  Text,
+  useInput,
+  useTerminalSize,
+  textProps
+} from '@shellcraft/ui';
 import { GAME_CONFIG } from '../config/game-config.js';
-import { wizardAnimation } from './loading-animation.js';
-import { generateMap } from './map-view.js';
+import { APP_NAME, NoGame, BACK_HINTS, gameMeta, logLines } from './components.js';
+import { MapView } from './map-view.js';
+import {
+  storyOf,
+  narrativeLines,
+  journalEntries,
+  roomStatus,
+  healthTone,
+  tensionTone,
+  needsTurn
+} from './turn.js';
 
-export function validateRenderableResponse(response) {
-  if (!response || typeof response !== 'object') {
-    throw new Error('[room] Invalid cached response: expected object');
-  }
+// The room's pure helpers moved to turn.js; re-exported for their tests.
+export { validateRenderableResponse, buildMeterBar, classifyAction, combineOutcomeMessage } from './turn.js';
 
-  if (!Array.isArray(response.items_here) || !Array.isArray(response.actions)) {
-    throw new Error('[room] Invalid cached response: "items_here" and "actions" must be arrays');
-  }
+const h = React.createElement;
 
-  if (typeof response.room_name !== 'string' || typeof response.description !== 'string') {
-    throw new Error('[room] Invalid cached response: missing room metadata');
-  }
-
-  if (response.actions.length === 0) {
-    throw new Error('[room] Invalid cached response: "actions" must not be empty');
-  }
-
-  if (typeof response.message !== 'string') {
-    throw new Error('[room] Invalid cached response: "message" must be a string');
-  }
-
-  if (!response.director || typeof response.director !== 'object') {
-    throw new Error('[room] Invalid cached response: missing "director"');
-  }
-
-  if (typeof response.director.style !== 'string' || typeof response.director.lastBeat !== 'string') {
-    throw new Error('[room] Invalid cached response: invalid "director" payload');
-  }
-
-  if (!Number.isFinite(response.director.tension)) {
-    throw new Error('[room] Invalid cached response: "director.tension" must be numeric');
-  }
-
-  if (typeof response.phase !== 'string' || !GAME_CONFIG.gameplay.timePhases.includes(response.phase)) {
-    throw new Error('[room] Invalid cached response: invalid "phase"');
-  }
-
-  if (!response.player || typeof response.player !== 'object') {
-    throw new Error('[room] Invalid cached response: missing "player"');
-  }
-
-  if (!Number.isFinite(response.player.health) || !Number.isFinite(response.player.maxHealth)) {
-    throw new Error('[room] Invalid cached response: invalid "player" payload');
-  }
-
-  if (response.active_encounter !== null && response.active_encounter !== undefined) {
-    if (typeof response.active_encounter !== 'object') {
-      throw new Error('[room] Invalid cached response: "active_encounter" must be object or null');
-    }
-    if (
-      typeof response.active_encounter.name !== 'string' ||
-      !Number.isFinite(response.active_encounter.currentHp) ||
-      !Number.isFinite(response.active_encounter.maxHp)
-    ) {
-      throw new Error('[room] Invalid cached response: invalid "active_encounter" payload');
-    }
-  }
-
-  return response;
+/**
+ * Split template: two rows of panels between the title and status bars,
+ * the left column 42 of 80 cells (52.5%), rows split evenly (11 + 11 at
+ * 80×24).
+ */
+export function roomLayout(columns, rows) {
+  const body = Math.max(rows - 2, 2);
+  const top = Math.ceil(body / 2);
+  const bottom = body - top;
+  const left = Math.min(Math.max(Math.round(columns * 0.525), 1), columns);
+  return { body, top, bottom, left, right: columns - left };
 }
 
-export function buildMeterBar(value, max, width = 18) {
-  if (!Number.isFinite(value) || !Number.isFinite(max) || max <= 0 || width < 1) {
-    throw new Error('[room] Invalid meter values');
-  }
-
-  const clamped = Math.min(Math.max(value, 0), max);
-  const filled = Math.round((clamped / max) * width);
-  return `${'='.repeat(filled)}${'-'.repeat(width - filled)}`;
+function StatusPanel({ status, height }) {
+  const { player, director, encounter, itemsHere, inventory, objective } = status;
+  const maxTension = GAME_CONFIG.systems.pacing.maxTension;
+  return h(
+    Panel,
+    { title: 'Status', height, paddingX: 0, paddingY: 1 },
+    h(Meter, {
+      label: 'HP',
+      value: player.health,
+      max: player.maxHealth,
+      display: `${player.health}/${player.maxHealth}`,
+      tone: healthTone(player.health, player.maxHealth)
+    }),
+    h(Meter, {
+      label: 'Tension',
+      value: director.tension,
+      max: maxTension,
+      display: `${director.tension}/${maxTension}`,
+      tone: tensionTone(director.tension, maxTension)
+    }),
+    h(BlankRow),
+    h(
+      Box,
+      { flexDirection: 'column', paddingLeft: 1 },
+      h(InfoRow, {
+        label: 'Threat',
+        value: encounter ? `${encounter.name} ${encounter.currentHp}/${encounter.maxHp} HP` : 'none',
+        tone: encounter ? 'warning' : 'default'
+      }),
+      h(InfoRow, { label: 'Objective', value: objective ?? 'none', tone: objective ? 'default' : 'muted' }),
+      h(InfoRow, {
+        label: 'Visible',
+        value: itemsHere.length ? itemsHere.join(', ') : 'nothing',
+        tone: itemsHere.length ? 'default' : 'muted'
+      }),
+      h(InfoRow, {
+        label: 'Inventory',
+        value: inventory.length ? inventory.join(', ') : 'empty',
+        tone: inventory.length ? 'default' : 'muted'
+      })
+    )
+  );
 }
 
-export function classifyAction(action) {
-  if (typeof action !== 'string' || !action.trim()) {
-    return 'ACTION';
-  }
+/**
+ * The room (Split template): narrative top left, status top right, the
+ * suggested actions with a free-text prompt bottom left (focused), the
+ * journal bottom right; m swaps the right column for the map.
+ *
+ * Focus: the action list or the free-text field, never both. Tab (or /)
+ * goes to the field; tab, esc or ⏎ come back. While the Game Master is
+ * thinking the actions are muted and take no keys; i, j, m, h and q still
+ * work. PgUp/PgDn (Home/End) scroll the story; ↑↓ stay with the actions.
+ */
+export function RoomScreen({ ctx }) {
+  const gameState = ctx.session.gameState;
+  const { columns, rows } = useTerminalSize();
+  const layout = roomLayout(columns, rows);
+  const [focus, setFocus] = useState('actions');
+  const [draft, setDraft] = useState('');
+  const [selected, setSelected] = useState(0);
+  const [showMap, setShowMap] = useState(false);
 
-  const text = action.toLowerCase();
-  if (text.includes('back to menu')) return 'SYSTEM';
-  if (text.includes('game master')) return 'CUSTOM';
+  const { busy, turnError } = ctx;
+  const pending = needsTurn(gameState);
 
-  if (/(^go\b|north|south|east|west|travel|retreat|enter|leave|return)/.test(text)) return 'MOVE';
-  if (/(attack|strike|fight|combat|defend|slay|guardian|sentinel|wolf)/.test(text)) return 'COMBAT';
-  if (/(talk|speak|ask|persuade|negotiate|elder|ranger|keeper)/.test(text)) return 'SOCIAL';
-  if (/(look|investigate|inspect|search|examine|scout|read)/.test(text)) return 'LOOK';
-  if (/(take|pick|grab|loot|collect|recover|claim|use)/.test(text)) return 'USE';
+  // Enter the room → run the turn it is waiting for (first turn, a chosen
+  // action, a narration that failed or was interrupted).
+  useEffect(() => {
+    if (gameState && pending && !busy && !turnError) ctx.runTurn();
+  }, [gameState, pending, busy, turnError]);
 
-  return 'ACTION';
-}
+  const story = storyOf(gameState);
+  const last = story.at(-1);
+  const storyKey = last ? `${last.turn}:${story.length}` : '';
+  // A new turn: the first action. (The story view is keyed by the turn, so
+  // it starts again at the end.)
+  useEffect(() => {
+    setSelected(0);
+  }, [storyKey, gameState]);
 
-function normalizeMessage(value) {
-  if (typeof value !== 'string') return '';
-  return value.trim().replace(/\s+/g, ' ');
-}
+  const response = gameState?.lastResponse ?? null;
+  const gameOver = Boolean(response?.game_over) && !pending;
+  const actions = response && !gameOver && !pending ? response.actions : [];
+  const previousActions = response && !gameOver ? response.actions : [];
+  const canAct = Boolean(gameState) && !busy && !turnError && !pending && !gameOver && actions.length > 0;
+  const asking = focus === 'ask' && canAct;
 
-function canonicalMessage(value) {
-  return normalizeMessage(value)
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, '')
-    .trim();
-}
+  const toActions = () => {
+    setFocus('actions');
+    ctx.setTyping(false);
+  };
+  const toAsk = () => {
+    setFocus('ask');
+    ctx.setTyping(true);
+  };
+  const act = (text, custom = false) => {
+    setDraft('');
+    toActions();
+    ctx.act(text, { custom });
+  };
 
-export function combineOutcomeMessage(deterministicMessage, narrationMessage) {
-  const deterministic = normalizeMessage(deterministicMessage);
-  const narration = normalizeMessage(narrationMessage);
+  // Narrative: the story so far, or the room's description before the
+  // first narration arrives.
+  const room = gameState ? GAME_CONFIG.world.rooms[gameState.currentRoom] : null;
+  const lines = story.length > 0
+    ? narrativeLines(story)
+    : room ? [{ text: room.description, tone: 'muted' }] : [];
+  if (gameOver) lines.push('', { text: 'Victory: the quest is complete.', tone: 'success', bold: true });
 
-  if (!deterministic) return narration;
-  if (!narration) return deterministic;
+  const storyWidth = Math.max(layout.left - 4, 1);
+  const storyHeight = Math.max(layout.top - 2, 1);
 
-  const deterministicCanonical = canonicalMessage(deterministic);
-  const narrationCanonical = canonicalMessage(narration);
-
-  // Exact match
-  if (deterministicCanonical === narrationCanonical) {
-    return deterministic;
-  }
-
-  // Cross inclusion
-  if (narrationCanonical.includes(deterministicCanonical)) {
-    return narration;
-  }
-
-  if (deterministicCanonical.includes(narrationCanonical)) {
-    return deterministic;
-  }
-
-  // Fuzzy match: check if they are "close enough" (e.g., share > 70% of words)
-  // This helps when LLM rephrases slightly but keeps the meaning, preventing "You took the sword. You pick up the sword."
-  const detWords = new Set(deterministicCanonical.split(' '));
-  const narWords = new Set(narrationCanonical.split(' '));
-  let intersection = 0;
-  for (const word of detWords) {
-    if (narWords.has(word)) intersection++;
-  }
-  const overlap = intersection / Math.min(detWords.size, narWords.size);
-  
-  if (overlap > 0.6) {
-    // If significant overlap, prefer narration as it's likely more flavorful
-    return narration;
-  }
-
-  return `${deterministic} ${narration}`.trim();
-}
-
-function buildActionLabel(action, index) {
-  const slot = String(index + 1).padStart(2, ' ');
-  const tag = classifyAction(action).padEnd(6, ' ');
-  return `${slot}. [${tag}] ${action}`;
-}
-
-export class RoomScreen {
-  constructor(context) {
-    this.context = context;
-    this.screen = context.screen;
-    this.llmEngine = new LLMGameEngine();
-    this.rulesEngine = new RulesEngine();
-    this.alive = true;
-    this.loadingInterval = null;
-    this.showMap = false;
-    this.widgets = [];
-    this.activeListeners = [];
-
-    this.context.session.gameState = normalizeGameState(this.context.session.gameState);
-    
-    // Bind methods
-    this.handleKey = this.handleKey.bind(this);
-    
-    this.render();
-  }
-
-  // Clear previous UI elements and listeners
-  cleanup() {
-    // Remove widgets
-    this.widgets.forEach(widget => {
-      widget.destroy();
-    });
-    this.widgets = [];
-
-    // Remove listeners
-    if (this.activeListeners.length > 0) {
-      this.activeListeners.forEach(({ keys, listener }) => {
-        // Handle array of keys or single key
-        const keyList = Array.isArray(keys) ? keys : [keys];
-        keyList.forEach(k => {
-          this.screen.unkey(k, listener);
-        });
-      });
-      this.activeListeners = [];
-    }
-    
-    // Clear loading interval if exists
-    if (this.loadingInterval) {
-      clearInterval(this.loadingInterval);
-      this.loadingInterval = null;
-    }
-  }
-
-  // Helper to register key listener and track it for cleanup
-  registerKey(keys, listener) {
-    // Ensure keys is an array
-    const keyList = Array.isArray(keys) ? keys : [keys];
-    // Register individually so we can unregister individually reliably
-    keyList.forEach(key => {
-      this.screen.key(key, listener);
-    });
-    this.activeListeners.push({ keys: keyList, listener });
-  }
-
-  // Handle generic input for list navigation if not caught by specific keys
-  handleInput(ch, key) {
-    if (this.screen.focused && this.screen.focused.type === 'list') {
-      if (key.name === 'j' || key.name === 'down') {
-         this.screen.focused.down();
-         this.screen.render();
-         return;
-      }
-      if (key.name === 'k' || key.name === 'up') {
-         this.screen.focused.up();
-         this.screen.render();
-         return;
-      }
-    }
-  }
-
-  render() {
-    this.cleanup();
-
-    const gameState = this.context.session.gameState;
-
-    if (gameState.pendingError) {
-      const error = gameState.pendingError;
-      delete gameState.pendingError;
-      this.renderError(error);
+  useInput((input, key) => {
+    if (asking) {
+      // The field takes the text; tab leaves it with the draft kept.
+      if (key.tab) toActions();
       return;
     }
-
-    if (gameState.pendingResponse) {
-      const pendingResponse = gameState.pendingResponse;
-      delete gameState.pendingResponse;
-      try {
-        const response = validateRenderableResponse(pendingResponse);
-        gameState.lastResponse = response;
-        this.renderRoom(response, gameState);
-      } catch (error) {
-        delete gameState.lastResponse;
-        this.context.saveGame();
-        this.renderError(error);
-      }
+    if (gameOver && key.return) {
+      ctx.navigate('game');
       return;
     }
-
-    if (gameState.pendingTurn || gameState.pendingAction || gameState.isFirstTurn || !gameState.lastResponse) {
-      this.renderLoading();
-      this.fetchTurnNarration(gameState);
-      return;
-    }
-
-    try {
-      const resumeResponse = validateRenderableResponse(gameState.lastResponse);
-      this.renderRoom(resumeResponse, gameState);
-    } catch (error) {
-      delete gameState.lastResponse;
-      this.context.saveGame();
-      this.renderError(error);
-    }
-  }
-
-  renderLoading() {
-    const { frames, interval, color } = wizardAnimation;
-    const frameHeight = frames[0].length;
-    const frameWidth = frames[0][0].length;
-
-    const animBox = UIComponents.createBox({
-      parent: this.screen,
-      top: 2,
-      left: 'center',
-      width: frameWidth + 4,
-      height: frameHeight + 2,
-      label: ' Resolving Turn ',
-      tags: true,
-      style: { border: { fg: color } },
-      align: 'center',
-      valign: 'middle'
-    });
-    this.widgets.push(animBox);
-
-    let frameIndex = 0;
-    const renderFrame = () => {
-      if (!this.alive) return;
-      const frame = frames[frameIndex];
-      const content = frame.map((line) => `{${color}-fg}${line}{/}`).join('\n');
-      animBox.setContent(content);
-      this.screen.render();
-      frameIndex = (frameIndex + 1) % frames.length;
-    };
-
-    renderFrame();
-    this.loadingInterval = setInterval(renderFrame, interval);
-
-    const footer = UIComponents.createBox({
-      parent: this.screen,
-      bottom: 0,
-      left: 0,
-      width: '100%',
-      height: 3,
-      content: '{center}{gray-fg}h=menu | q=quit{/}',
-      tags: true,
-      style: { fg: 'white' }
-    });
-    this.widgets.push(footer);
-
-    this.registerKey(['h'], () => {
-      this.cleanupLoading();
-      this.context.navigate('game');
-    });
-
-    this.screen.render();
-  }
-
-  cleanupLoading() {
-    this.alive = false;
-    if (this.loadingInterval) {
-      clearInterval(this.loadingInterval);
-      this.loadingInterval = null;
-    }
-  }
-
-  handleKey(ch, key) {
-    // Dummy handler if needed
-  }
-
-
-  async fetchTurnNarration(gameState) {
-    try {
-      if (!gameState.pendingTurn) {
-        const action = gameState.isFirstTurn
-          ? '__start__'
-          : (gameState.pendingAction || GAME_CONFIG.gameplay.genericActions[0]);
-        
-        // Pass the custom action flag to the RulesEngine via gameState
-        // The RulesEngine checks `gameState.pendingActionIsCustom`
-        const turn = this.rulesEngine.resolveTurn(gameState, action);
-        
-        // Cleanup after rules processing
-        delete gameState.pendingActionIsCustom;
-        gameState.pendingTurn = turn;
-        delete gameState.pendingAction;
-        this.context.saveGame();
+    if (input === 'h' || input === 'b' || key.escape) {
+      ctx.navigate('game');
+    } else if (input === 'i') {
+      ctx.navigate('inventory');
+    } else if (input === 'j') {
+      ctx.navigate('journal');
+    } else if (input === 'm' && gameState) {
+      setShowMap((v) => !v);
+    } else if (input === 'r' && turnError && !busy) {
+      ctx.retry();
+    } else if (canAct && (key.tab || input === '/')) {
+      toAsk();
+    } else if (canAct && /^[1-9]$/.test(input)) {
+      const index = Number(input) - 1;
+      if (index < actions.length) {
+        setSelected(index);
+        act(actions[index]);
       }
-
-      const narration = await this.llmEngine.narrateTurn(gameState.pendingTurn, gameState.messageHistory);
-      if (!this.alive) return;
-
-      gameState.messageHistory = narration.messages;
-      const turn = gameState.pendingTurn;
-      const combinedMessage = combineOutcomeMessage(
-        turn.outcome.message,
-        narration.response.message
-      );
-      const response = {
-        room_name: turn.room.name,
-        description: narration.response.description,
-        items_here: turn.itemsHere,
-        actions: turn.actions,
-        message: combinedMessage,
-        game_over: turn.gameOver,
-        director: turn.director,
-        phase: turn.phase,
-        player: turn.player,
-        active_encounter: turn.activeEncounter,
-        action_outcome: turn.outcome.status,
-        deterministic_message: turn.outcome.message
-      };
-
-      delete gameState.pendingTurn;
-      gameState.lastTurn = turn;
-      gameState.lastResponse = response;
-      gameState.pendingResponse = response;
-
-      if (response.game_over) {
-        gameState.pendingResponse._gameOver = true;
-      }
-
-      this.context.saveGame();
-      this.cleanupLoading();
-      this.context.navigate('room');
-    } catch (error) {
-      if (!this.alive) return;
-      this.cleanupLoading();
-      gameState.pendingError = error;
-      this.context.navigate('room');
     }
+  });
+
+  if (!gameState) {
+    return h(
+      Screen,
+      { app: APP_NAME, screen: 'Room', meta: gameMeta(null), hints: BACK_HINTS, message: ctx.message },
+      h(Panel, { title: 'Room' }, h(NoGame))
+    );
   }
 
-  renderRoom(response, gameState) {
-    if (response._gameOver) {
-      this.renderGameOver(response);
-      return;
-    }
-
-    const hpBar = buildMeterBar(response.player.health, response.player.maxHealth);
-    const tensionMax = GAME_CONFIG.systems.pacing.maxTension;
-    const tensionBar = buildMeterBar(response.director.tension, tensionMax);
-    const activeQuest = Object.values(gameState.worldState.quests)
-      .find((quest) => quest.status === 'active');
-    const objectiveText = activeQuest
-      ? `${activeQuest.title} (${Math.round(activeQuest.progress)}%)`
-      : 'No active objective';
-    const itemsText = response.items_here.length > 0
-      ? `Visible: ${response.items_here.join(', ')}`
-      : 'Visible: none';
-    const encounterText = response.active_encounter
-      ? `Threat: ${response.active_encounter.name} (${response.active_encounter.currentHp}/${response.active_encounter.maxHp} HP)`
-      : 'Threat: none';
-    const roomMeta = `Phase: ${response.phase} | Style: ${response.director.style} | Beat: ${response.director.lastBeat}`;
-    const footerHeight = 4;
-    const topHeight = Math.max(9, Math.min(13, Math.floor(this.screen.height * 0.45)));
-    const lowerHeight = Math.max(7, this.screen.height - topHeight - footerHeight);
-    const rawMessage = response.message || '';
-    const displayMessage = rawMessage.length > 260
-      ? `${rawMessage.slice(0, 257)}...`
-      : rawMessage;
-    const msgLineWidth = Math.max(30, Math.floor(this.screen.width * 0.62) - 10);
-    const messageHeight = displayMessage
-      ? Math.min(Math.ceil(displayMessage.length / msgLineWidth) + 2, 5)
-      : 0;
-    const rightPaneTop = topHeight;
-    const leftPaneTop = topHeight + messageHeight;
-    const actionsHeight = Math.max(4, lowerHeight - messageHeight);
-
-    this.widgets.push(UIComponents.createBox({
-      parent: this.screen,
-      top: 0,
-      left: 0,
-      width: '64%',
-      height: topHeight,
-      label: ` ${response.room_name} `,
-      content: `\n  ${response.description}\n\n  ${roomMeta}`,
-      tags: true,
-      style: { border: { fg: 'yellow' } }
-    }));
-
-    if (this.showMap) {
-      this.widgets.push(UIComponents.createBox({
-        parent: this.screen,
-        top: 0,
-        left: '64%',
-        width: '36%',
-        height: topHeight + lowerHeight,
-        label: ' Regional Map ',
-        content: '\n' + generateMap(gameState),
-        tags: true,
-        style: { border: { fg: 'white' } }
-      }));
-    } else {
-      this.widgets.push(UIComponents.createBox({
-        parent: this.screen,
-        top: 0,
-        left: '64%',
-        width: '36%',
-        height: topHeight,
-        label: ' Tactical Telemetry ',
-        content: `
-      HP      [${hpBar}] ${response.player.health}/${response.player.maxHealth}
-      Tension [${tensionBar}] ${response.director.tension}/${tensionMax}
-    
-      ${encounterText}
-      Objective:
-      ${objectiveText}`,
-        style: { border: { fg: 'cyan' } }
-      }));
-    }
-
-    if (displayMessage) {
-      this.widgets.push(UIComponents.createBox({
-        parent: this.screen,
-        top: topHeight,
-        left: 0,
-        width: '64%',
-        height: messageHeight,
-        label: ' Outcome ',
-        content: `  {green-fg}${displayMessage}{/}`,
-        tags: true,
-        style: { border: { fg: 'green' } }
-      }));
-    }
-
-    const invText = gameState.inventory.length > 0
-      ? gameState.inventory.join(', ')
-      : 'Empty';
-    const invDisplay = invText.length > 180 ? `${invText.slice(0, 177)}...` : invText;
-
-    if (!this.showMap) {
-      this.widgets.push(UIComponents.createBox({
-        parent: this.screen,
-        top: rightPaneTop,
-        left: '64%',
-        width: '36%',
-        height: lowerHeight,
-        label: ' Field Notes ',
-        content: `
-  ${itemsText}
-
-  Inventory:
-  ${invDisplay}
-
-  Turn: ${gameState.moves}
-  Last Outcome: ${response.action_outcome || 'n/a'}`,
-        style: { border: { fg: 'green' } }
-      }));
-    }
-
-    const allActions = [
-      ...response.actions,
-      GAME_CONFIG.gameplay.freeTextLabel,
-      GAME_CONFIG.gameplay.backToMenuLabel
+  const status = roomStatus(gameState);
+  const mapHint = ['m', showMap ? 'status' : 'map'];
+  let hints;
+  if (asking) hints = [['⏎', 'send'], ['esc', 'cancel'], ['tab', 'actions']];
+  else if (gameOver) hints = [['⏎', 'menu'], ['i', 'items'], ['j', 'journal'], mapHint, ['q', 'quit']];
+  else if (turnError && !busy) hints = [['r', 'retry'], ['h', 'menu'], ['q', 'quit']];
+  else if (!canAct) hints = [['i', 'items'], ['j', 'journal'], mapHint, ['h', 'menu'], ['q', 'quit']];
+  else {
+    hints = [
+      [actions.length > 1 ? `1-${Math.min(actions.length, 9)}` : '1', 'act'],
+      ['tab', 'ask'],
+      ['i', 'items'],
+      ['j', 'journal'],
+      mapHint,
+      ['h', 'menu'],
+      ['q', 'quit']
     ];
-    const actionItems = allActions.map((action, index) => buildActionLabel(action, index));
-
-    const actions = UIComponents.createList({
-      parent: this.screen,
-      top: leftPaneTop,
-      left: 0,
-      width: '64%',
-      height: actionsHeight,
-      label: ' Tactical Actions ',
-      items: actionItems,
-      keys: false,
-      vi: false, // Turn off vi keys on the list itself to prevent conflict
-      scrollable: true,
-      alwaysScroll: true,
-      scrollbar: {
-        ch: ' ',
-        style: { bg: 'magenta' }
-      },
-      style: {
-        border: { fg: 'magenta' },
-        selected: { bg: 'blue', fg: 'white' },
-        item: { fg: 'white' }
-      }
-    });
-    this.widgets.push(actions);
-
-    let menuActive = false;
-    const handleSelect = (index) => {
-      if (!menuActive) return;
-      const action = allActions[index];
-      if (!action) return;
-
-      if (action === GAME_CONFIG.gameplay.backToMenuLabel) {
-        this.context.navigate('game');
-        return;
-      }
-
-      if (action === GAME_CONFIG.gameplay.freeTextLabel) {
-        this.showTextInput(actions, gameState);
-        return;
-      }
-
-      gameState.pendingAction = action;
-      this.context.navigate('room');
-    };
-
-    actions.on('select', (_item, index) => handleSelect(index));
-
-    const isEditing = () => this.screen.focused?.type === 'textbox';
-    this.widgets.push(UIComponents.createBox({
-      parent: this.screen,
-      bottom: 0,
-      left: 0,
-      width: '100%',
-      height: footerHeight,
-      content: `{center}Turn ${gameState.moves} | HP ${response.player.health}/${response.player.maxHealth} | Tension ${response.director.tension}/${tensionMax}{/}\n{center}{gray-fg}1-9=quick action | Enter=select | h/b=menu | i=inv | j=jrnl | m=map | q=quit{/}`,
-      tags: true,
-      style: { fg: 'white' }
-    }));
-
-    this.registerKey(['h', 'b', 'escape'], () => {
-      if (isEditing()) return;
-      this.context.navigate('game');
-    });
-    this.registerKey(['i'], () => {
-      if (isEditing()) return;
-      this.context.navigate('inventory');
-    });
-    this.registerKey(['j'], () => {
-      if (isEditing()) return;
-      this.context.navigate('journal');
-    });
-    this.registerKey(['m'], () => {
-      if (isEditing()) return;
-      this.showMap = !this.showMap;
-      this.render();
-    });
-
-    this.registerKey(['up'], () => {
-      if (isEditing() || !menuActive) return;
-      actions.up();
-      this.screen.render();
-    });
-    this.registerKey(['down'], () => {
-      if (isEditing() || !menuActive) return;
-      actions.down();
-      this.screen.render();
-    });
-    this.registerKey(['enter'], () => {
-      if (isEditing() || !menuActive) return;
-      handleSelect(actions.selected);
-    });
-    this.registerKey(['1', '2', '3', '4', '5', '6', '7', '8', '9'], (_ch, key) => {
-      if (isEditing() || !menuActive) return;
-      const index = Number(key.name) - 1;
-      if (Number.isInteger(index) && index >= 0 && index < allActions.length) {
-        actions.select(index);
-        this.screen.render();
-        handleSelect(index);
-      }
-    });
-
-    setTimeout(() => {
-      menuActive = true;
-      actions.select(0);
-      actions.focus();
-      this.screen.render();
-    }, 0);
   }
 
-  showTextInput(actionsList, gameState) {
-    const inputBox = UIComponents.createInput({
-      parent: this.screen,
-      top: 'center',
-      left: 'center',
-      width: '70%',
-      height: 3,
-      label: ' Enter Action (Esc=cancel) ',
-      style: { border: { fg: 'yellow' } }
-    });
-
-    inputBox.on('submit', (value) => {
-      inputBox.destroy();
-      const text = value?.trim();
-      if (text) {
-        gameState.pendingAction = text;
-        gameState.pendingActionIsCustom = true;
-        this.context.navigate('room');
-        return;
-      }
-      actionsList.focus();
-      this.screen.render();
-    });
-
-    inputBox.on('cancel', () => {
-      inputBox.destroy();
-      actionsList.focus();
-      this.screen.render();
-    });
-
-    inputBox.focus();
-    this.screen.render();
+  let message = ctx.message;
+  if (turnError && !busy) {
+    // The status bar shortens it to fit next to the hints.
+    message = { tone: 'error', text: `The Game Master failed: ${turnError}` };
+  } else if (gameOver && !message) {
+    message = { tone: 'success', text: 'Victory! Quest complete' };
   }
 
-  renderError(error) {
-    const message = (error.message || 'Unknown error').slice(0, 120);
-    this.widgets.push(UIComponents.createBox({
-      parent: this.screen,
-      top: 'center',
-      left: 'center',
-      width: '75%',
-      height: 10,
-      label: ' Turn Failed ',
-      content: `\n  {red-fg}Turn narration failed.{/}\n\n  ${message}\n\n  {gray-fg}r=retry narration | h=menu{/}`,
-      tags: true,
-      style: { border: { fg: 'red' } }
-    }));
-
-    this.registerKey(['r'], () => {
-      this.context.navigate('room');
+  const items = (canAct ? actions : previousActions).map((label, i) => ({ label, hint: String(i + 1) }));
+  // Panel rows minus its edges and the prompt row.
+  const listHeight = Math.max(layout.bottom - 3, 1);
+  let actionsBody;
+  if (gameOver) {
+    actionsBody = h(EmptyState, { message: 'The quest is complete.', hint: 'Back to the menu:', k: '⏎', label: 'menu' });
+  } else if (items.length === 0) {
+    actionsBody = h(
+      Box,
+      { height: 1, paddingLeft: 3, overflow: 'hidden' },
+      h(Text, { ...textProps('muted'), wrap: 'truncate-end' }, 'Waiting for the first turn')
+    );
+  } else if (canAct && !asking) {
+    actionsBody = h(SelectList, {
+      items,
+      selectedIndex: selected,
+      onChange: setSelected,
+      onSelect: (_i, item) => act(item.label),
+      numberKeys: false,
+      height: listHeight
     });
-    this.registerKey(['h'], () => {
-      this.context.navigate('game');
+  } else {
+    // No selection bar while waiting or typing; muted while waiting.
+    actionsBody = h(SelectList, {
+      items: items.map((item) => ({ ...item, disabled: !canAct })),
+      focused: false,
+      height: listHeight
     });
-    this.screen.render();
   }
 
-  renderGameOver(response) {
-    this.widgets.push(UIComponents.createBox({
-      parent: this.screen,
-      top: 'center',
-      left: 'center',
-      width: '75%',
-      height: 10,
-      label: ` ${response.room_name} `,
-      content: `\n  ${response.description}\n\n  {bold}{yellow-fg}VICTORY - QUEST COMPLETE{/}\n\n  {gray-fg}Press Enter to return to menu{/}`,
-      tags: true,
-      style: { border: { fg: 'yellow' } }
-    }));
+  const actionsPanel = h(
+    Panel,
+    { title: 'Actions', focused: true, padding: 0 },
+    actionsBody,
+    gameOver ? null : h(Box, { flexGrow: 1 }),
+    gameOver
+      ? null
+      : h(
+          Box,
+          { height: 1, flexShrink: 0, paddingX: 1 },
+          h(TextField, {
+            label: '>',
+            labelWidth: 2,
+            valueWidth: 'fill',
+            value: draft,
+            focused: asking,
+            placeholder: 'Ask the Game Master…',
+            onChange: setDraft,
+            onSubmit: (value) => {
+              const text = value.trim();
+              if (text) act(text, true);
+              else toActions();
+            },
+            onCancel: () => {
+              setDraft('');
+              toActions();
+            }
+          })
+        )
+  );
 
-    this.registerKey(['enter'], () => this.context.navigate('game'));
-    this.screen.render();
-  }
+  const right = showMap
+    ? h(Panel, { title: 'Map' }, h(MapView, { gameState }))
+    : h(
+        Box,
+        { flexDirection: 'column', flexGrow: 1 },
+        h(StatusPanel, { status, height: layout.top }),
+        h(
+          Panel,
+          { title: 'Journal' },
+          h(ScrollView, {
+            lines: logLines(journalEntries(story)),
+            width: Math.max(layout.right - 4, 1),
+            height: Math.max(layout.bottom - 4, 1),
+            follow: true,
+            isActive: false
+          })
+        )
+      );
+
+  return h(
+    Screen,
+    { app: APP_NAME, screen: status.roomName, meta: gameMeta(gameState), hints, message },
+    h(
+      Box,
+      { flexGrow: 1 },
+      h(
+        Box,
+        { flexDirection: 'column', width: layout.left, flexShrink: 0 },
+        h(
+          Panel,
+          { title: status.roomName, height: layout.top, paddingY: 0 },
+          h(ScrollView, {
+            key: storyKey,
+            lines,
+            width: storyWidth,
+            height: storyHeight,
+            follow: true,
+            keys: 'page',
+            isActive: !asking
+          })
+        ),
+        actionsPanel
+      ),
+      right
+    )
+  );
 }

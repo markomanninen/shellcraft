@@ -1,70 +1,42 @@
-import { UIComponents } from './components.js';
+import React from 'react';
+import { Screen, Panel, Table, EmptyState, useTerminalSize } from '@shellcraft/ui';
+import { APP_NAME, NoGame, BACK_HINTS, SCROLL_HINTS, useBackKeys, plural } from './components.js';
 
-export class InventoryScreen {
-  constructor(context) {
-    this.context = context;
-    this.screen = context.screen;
-    this.render();
-  }
+const h = React.createElement;
 
-  render() {
-    const contentTop = 4;
-    const footerHeight = 3;
-    const contentHeight = Math.max(8, this.screen.height - contentTop - footerHeight);
+const COLUMNS = [
+  { label: '#', width: 3, align: 'right' },
+  { label: 'Item', width: 20, grow: true }
+];
 
-    UIComponents.createBox({
-      parent: this.screen,
-      top: 0,
-      left: 0,
-      width: '100%',
-      height: 3,
-      content: '{center}{bold}{green-fg}INVENTORY{/}',
-      tags: true
-    });
+/** Table template: the items in one panel; ↑↓ scroll when they do not fit. */
+export function InventoryScreen({ ctx }) {
+  const gameState = ctx.session.gameState;
+  const { rows } = useTerminalSize();
+  useBackKeys(ctx);
 
-    const gameState = this.context.session.gameState;
+  const items = gameState?.inventory ?? [];
+  // Body rows: terminal minus title and status bars, panel edges, header.
+  const height = Math.max(rows - 5, 1);
+  const meta = gameState ? plural(items.length, 'item') : 'no game';
+  const hints = items.length > height ? SCROLL_HINTS : BACK_HINTS;
 
-    if (!gameState || gameState.inventory.length === 0) {
-      UIComponents.createBox({
-        parent: this.screen,
-        top: contentTop,
-        left: 'center',
-        width: '60%',
-        height: contentHeight,
-        label: ' Your Items ',
-        content: '{center}{yellow-fg}Your inventory is empty!{/}\n{center}Explore and collect items.',
-        tags: true,
-        valign: 'middle'
-      });
-    } else {
-      const table = UIComponents.createTable({
-        parent: this.screen,
-        top: contentTop,
-        left: 'center',
-        width: '80%',
-        height: contentHeight,
-        label: ' Your Items ',
-        data: [
-          ['#', 'Item'],
-          ...gameState.inventory.map((item, i) => [(i+1).toString(), item])
-        ]
-      });
-
-      table.focus();
-    }
-
-    UIComponents.createBox({
-      parent: this.screen,
-      bottom: 0,
-      left: 0,
-      width: '100%',
-      height: 3,
-      content: '{center}{gray-fg}b=back | q=quit{/}',
-      tags: true
-    });
-
-    this.screen.key(['b', 'escape'], () => {
-      this.context.navigate('game');
+  let body;
+  if (!gameState) body = h(NoGame);
+  else if (items.length === 0) {
+    body = h(EmptyState, { message: 'Your pack is empty.', hint: 'Take what you find in the rooms:', k: 'b', label: 'back' });
+  } else {
+    body = h(Table, {
+      columns: COLUMNS,
+      rows: items.map((item, i) => [String(i + 1), item]),
+      selectedIndex: -1,
+      height
     });
   }
+
+  return h(
+    Screen,
+    { app: APP_NAME, screen: 'Inventory', meta, hints, message: ctx.message },
+    h(Panel, { title: 'Inventory', focused: items.length > 0, padding: items.length > 0 ? 0 : 1 }, body)
+  );
 }

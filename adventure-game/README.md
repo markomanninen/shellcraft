@@ -2,6 +2,10 @@
 
 SSH-accessible terminal RPG with a deterministic simulation core and LLM narration layer.
 
+<p align="center">
+  <img src="../docs/images/adventure-game.svg" alt="adventure-game: start, the Game Master is thinking, a narrated turn, an action and a free-text question" width="748">
+</p>
+
 ## What Changed (Phase 1-3)
 
 - Phase 1:
@@ -16,6 +20,9 @@ SSH-accessible terminal RPG with a deterministic simulation core and LLM narrati
   - Adaptive narrative style (`balanced`, `grim`, `heroic`, `mystic`).
   - Balancing metrics (action profile, checks, inventory peak, quest completions).
   - UI refresh: campaign snapshot panel, split-pane room HUD, categorized tactical actions, 1-9 quick actions, and animated screen transitions.
+- Ink port:
+  - The UI moved from blessed to Ink (React for the terminal) through the shared [`@shellcraft/ui`](../ui/README.md) package, following the Figma templates (Menu + detail, Split, Empty).
+  - Waiting for the LLM is a spinner in the status bar ("The Game Master is thinking"), not a separate loading screen; results and errors are status bar messages, never boxes over the screen.
 
 ## Core Principles
 
@@ -44,18 +51,20 @@ src/
 ├── llm/
 │   ├── ollama-client.js      # typed Ollama client using runtime config
 │   └── game-engine.js        # narration-only prompt + strict JSON validation
-├── ui/
-│   ├── game.js               # menu
-│   ├── room.js               # turn loop: resolve -> narrate -> render
-│   ├── journal.js            # quests, factions, npc memory
+├── ui/                       # Ink components (@shellcraft/ui)
+│   ├── app.js                # AdventureApp: screens, status message, turn runner
+│   ├── turn.js               # turn loop helpers: resolve -> narrate -> response, story
+│   ├── game.js               # menu + campaign snapshot
+│   ├── room.js               # room (Split template): story, status, actions, journal
+│   ├── map-view.js           # regional map
+│   ├── journal.js            # quests, factions, npc memory, turn log
 │   ├── stats.js              # pacing + check + action metrics
 │   ├── inventory.js
 │   ├── help.js
-│   ├── components.js
-│   └── loading-animation.js
+│   └── components.js         # shared rows, empty state, journal log
 └── server/
     ├── index.js              # SSH server bootstrap (validated config)
-    ├── router.js             # screen navigation
+    ├── router.js             # hands each SSH shell to the Ink app (serve())
     └── session.js            # persisted session + runtime state hydration
 ```
 
@@ -115,15 +124,24 @@ ssh localhost -p 2222
 
 | Key | Context | Action |
 |---|---|---|
-| Up / Down | Menus | Navigate |
-| Enter | Menus | Select |
-| `1-9` | Menus + Room actions | Quick-select indexed options |
-| `h` | Room | Main menu |
+| Up / Down | Menus, lists | Navigate (or scroll journal, stats, help) |
+| Enter | Menus, room actions | Select |
+| `1-9` | Menu | Jump to an item |
+| `1-9` | Room | Take that action at once |
+| Tab (or `/`) | Room | Ask the Game Master in your own words; Tab, Esc or Enter go back |
+| PgUp / PgDn | Room | Scroll the story |
+| `h` | Room, secondary screens | Main menu |
 | `i` | Room | Inventory |
 | `j` | Room | Journal |
-| `r` | Error | Retry narration |
-| `b` / Escape | Secondary screens | Back |
-| `q` / Ctrl+C | Global (except text input) | Quit |
+| `m` | Room | Map in place of the status panels |
+| `r` | Room, after a failed narration | Retry narration |
+| `b` / Escape | Secondary screens | Back (to the room or the menu) |
+| `q` | Global (except while typing) | Quit |
+| Ctrl+C | Global | Quit |
+
+The keys of each screen are shown in its status bar. After changing `../ui`,
+refresh the copy in `node_modules` with `./npmw ci` (`.npmrc` sets
+`install-links=true`, so there is one React).
 
 ## Scripts
 

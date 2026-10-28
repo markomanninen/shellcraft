@@ -27,11 +27,17 @@ This project adheres to a code of conduct. By participating, you are expected to
    ```
 
 2. **Set Up Development Environment**
+
+   You need Node.js 22 or newer (Ink 8).
+
    ```bash
-   # For each demo app you want to work on:
+   # The shared ui package
+   cd ui && npm ci && cd ..
+
+   # Each demo app you want to work on (./npmw loads nvm if npm is not on PATH)
    cd demo-shop  # or admin-dashboard, adventure-game, animation-demo
-   npm install
-   npm run generate-keys
+   ./npmw install
+   ./npmw run generate-keys   # not for animation-demo
    ```
 
 3. **Create a Branch**
@@ -47,7 +53,7 @@ This project adheres to a code of conduct. By participating, you are expected to
 
 ```bash
 cd demo-shop  # or any demo app
-npm start     # Start the SSH server
+./npmw start  # Start the SSH server
 # In another terminal:
 ssh localhost -p 2222
 ```
@@ -55,23 +61,75 @@ ssh localhost -p 2222
 ### Development Mode with Auto-Reload
 
 ```bash
-npm run dev
+./npmw run dev
 ```
+
+### Changing the ui Package
+
+The apps get `ui/` as a copy in `node_modules` (`install-links=true`). After
+you change `ui/`:
+
+```bash
+cd ui && npm test             # the ui tests
+cd ../demo-shop && ./npmw ci  # refresh the copy, then test the app
+./npmw test
+```
+
+Run the tests of every app that uses what you changed.
+
+### Changing the Generator
+
+The Generator workflow (`.github/workflows/generator.yml`) generates both app
+types and runs their tests when `init.sh`, `quick-start.sh` or `ui/` change.
+To check locally, generate each app type outside the repository and run its
+tests:
+
+```bash
+./init.sh /tmp/check-minimal minimal
+./init.sh /tmp/check-shop ecommerce
+cd /tmp/check-minimal && npm install && npm test
+cd /tmp/check-shop && npm install && npm test
+```
+
+Keep `init.sh` a bash script that works with bash 3.2 (macOS) and without
+GNU-only flags (Linux and macOS). Run `shellcheck init.sh`.
+
+### README Recordings
+
+The animated terminals in the READMEs (`docs/images/*.svg`) are recorded from
+the real apps, not from a screen recorder:
+
+```bash
+(cd demo-shop && npm ci) # and the same in admin-dashboard, adventure-game, animation-demo
+node scripts/record-readme.mjs              # all four apps
+node scripts/record-readme.mjs demo-shop    # one app
+```
+
+`scripts/record-readme.mjs` drives each app with `renderTerminal()` from
+`@shellcraft/ui/testing` at 80×24 (adventure-game with the stub LLM from its
+tests, admin-dashboard with its demo system data), keeps every distinct
+screen with how long it stays up, and writes an SVG: text runs placed by
+column, box lines and blocks as shapes, the VS Code Dark+ terminal colors,
+dim as opacity, and one CSS `@keyframes` animation that steps through the
+frames. No scripts and no external fonts or files, so GitHub shows it in an
+`<img>`. Identical rows and frames are stored once. Re-record after a change
+that alters what the apps look like; the scenarios are at the bottom of the
+script.
 
 ### Running Tests
 
 ```bash
 # Run all tests
-npm test
+./npmw test
 
 # Run only unit tests
-npm run test:unit
+./npmw run test:unit
 
 # Run only E2E tests
-npm run test:e2e
+./npmw run test:e2e
 
 # Watch mode for development
-npm run test:watch
+./npmw run test:watch
 ```
 
 ## Coding Standards
@@ -84,25 +142,34 @@ npm run test:watch
 - Use **meaningful variable names**
 - Add **JSDoc comments** for complex functions
 - Keep functions **small and focused**
+- No JSX and no build step: `const h = React.createElement`
+
+### UI Rules
+
+Screens follow [DESIGN_PRINCIPLES.md](./DESIGN_PRINCIPLES.md): one title bar
+and one status bar per screen (`Screen`), key hints like `q quit`, colors only
+through the theme helpers, no floating boxes, no Exit menu items. Use the
+components from `@shellcraft/ui`; if one is missing, add it to `ui/` with
+tests rather than drawing it in an app.
 
 ### File Organization
 
 ```
 src/
 ├── server/        # Server-side logic
-│   ├── index.js   # Main entry point
-│   ├── router.js  # Screen routing
+│   ├── index.js   # SSH server: authentication, sessions, shells
+│   ├── router.js  # Passes each shell to serve() from @shellcraft/ui
 │   └── session.js # Session management
-├── ui/            # User interface screens
-│   ├── components.js  # Reusable UI components
-│   └── *.js       # Individual screens
+├── ui/            # Ink screens
+│   ├── app.js     # Current screen, status message, ctx
+│   └── *.js       # One screen per file
 └── models/        # Data models and business logic
 ```
 
 ### Naming Conventions
 
 - **Files**: lowercase with hyphens (`my-screen.js`)
-- **Classes**: PascalCase (`MyScreen`)
+- **Classes and components**: PascalCase (`MyScreen`)
 - **Functions**: camelCase (`myFunction`)
 - **Constants**: UPPER_SNAKE_CASE (`MAX_CONNECTIONS`)
 
@@ -115,10 +182,18 @@ src/
    - Mock external dependencies
    - Focus on business logic
 
-2. **E2E Tests** (`test/e2e/`)
+2. **Screen Tests** (`test/unit/screens.test.js`)
+   - Render screens with `renderTerminal()` from `@shellcraft/ui/testing`
+   - Check 80×24 and 100×30: title bar on row 0, status bar on the last row
+   - Press keys and check rows and styles (`styleAt`, `boldDimText`)
+   - Call `cleanupTerminals()` in `afterEach`
+
+3. **E2E Tests** (`test/e2e/`)
    - Test complete user workflows
    - Use actual SSH connections
    - Verify screen transitions
+
+See [TESTING_SUMMARY.md](./TESTING_SUMMARY.md) for examples.
 
 ### Test Structure
 
@@ -228,8 +303,11 @@ All pull requests automatically run:
 - **README.md**: Project overview and quick start
 - **USAGE_GUIDE.md**: Detailed usage instructions
 - **QUICK_REFERENCE.md**: Quick reference guide
-- **DESIGN_PRINCIPLES.md**: Design decisions and patterns
+- **DESIGN_PRINCIPLES.md**: Screen rules and Ink over SSH
+- **ui/README.md**: The shared components, theme and test helpers
+- **docs/images/**: README recordings (`scripts/record-readme.mjs`)
 - **SECURITY.md**: Security policies and guidelines
+- **INDEX.md**: All documents
 
 ### Code Documentation
 

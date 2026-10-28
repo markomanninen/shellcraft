@@ -1,32 +1,39 @@
 # Admin Dashboard
 
-A terminal-based system monitoring dashboard accessible over SSH. Built with [ssh2](https://github.com/mscdex/ssh2) and [blessed](https://github.com/chjj/blessed), it displays real-time system information (CPU, memory, processes, network interfaces, services) directly in the terminal.
+A terminal-based system monitoring dashboard accessible over SSH. Built with [ssh2](https://github.com/mscdex/ssh2) and [Ink](https://github.com/vadimdemedes/ink) (through the shared [`@shellcraft/ui`](../ui/README.md) package), it displays live system information (CPU, memory, processes, network interfaces, services) directly in the terminal.
+
+<p align="center">
+  <img src="../docs/images/admin-dashboard.svg" alt="admin-dashboard: the menu with a live detail panel, CPU and memory meters, the log view following" width="748">
+</p>
 
 > **Security Warning**
 >
-> This application exposes real system information -- hostname, running processes, network interfaces, memory usage, and service status -- to any client that connects over SSH. Authentication is disabled for demo purposes (`none` auth method is accepted). **Do not run this on a public network or production server without adding proper authentication and access controls.**
+> This application exposes real system information -- hostname, running processes, network interfaces, memory usage, and service status -- to any client that connects over SSH. Anyone can sign in for demo purposes: a client with a key must prove it holds the key, and one without a key gets in anonymously through keyboard-interactive (see [`@shellcraft/ui/auth`](../ui/README.md#ssh-authentication-shellcraftuiauth)). **Do not run this on a public network or production server without adding proper authentication and access controls.**
 
 ## Features
 
 - **Real-time system monitoring** using the Node.js `os` module and shell commands (`ps aux`, `launchctl`/`systemctl`)
 - **SSH server** built on ssh2 for remote terminal access
-- **Terminal UI** rendered with blessed (256-color, mouse support, scrollable regions)
+- **Terminal UI** rendered with Ink (React for the terminal) via `@shellcraft/ui`: title bar, panels, tables, meters and a status bar, in the 16 ANSI colors of the user's own terminal theme
+- **Live stats**: CPU, memory, load and processes refresh every 2 seconds on the screens that show them (`r` refreshes by hand)
 - **Session management** via SSH public key fingerprint (falls back to `anonymous`)
-- **Screen navigation** with a router that handles teardown and re-rendering between views
-- **Reusable component library** for boxes, lists, tables, forms, inputs, buttons, and messages
+- **Resizes with the terminal** (80×24 is the design target)
 
 ## Screens
 
 | Screen | Route | Description |
 |--------|-------|-------------|
-| Dashboard Menu | `dashboard` | Main menu with navigation to all other screens |
-| System Overview | `overview` | Hostname, platform, architecture, CPU count, memory, uptime, load averages |
-| CPU and Memory | `resources` | Per-core CPU usage table and memory breakdown |
-| Process Monitor | `processes` | Output of `ps aux` (top 10 processes) |
-| System Logs | `logs` | Simulated log entries (randomly generated) |
-| Network Info | `network` | All network interfaces with addresses, families, and netmasks |
-| Services Status | `services` | Running services via `launchctl list` (macOS) or `systemctl` (Linux) |
-| Settings | `settings` | Node version, environment info, and current session details |
+| Dashboard | `dashboard` | Menu + detail: the menu (focused) and a summary of the highlighted item that follows the selection; ⏎ opens it |
+| System overview | `overview` | Hostname, platform, architecture, CPUs, uptime, load averages, memory; CPU and memory meters (live) |
+| CPU & memory | `resources` | Overall and per-core CPU meters, memory meter and totals (live) |
+| Processes | `processes` | `ps aux` (first 9 processes) as a table (live) |
+| Logs | `logs` | Simulated log; follows new entries (one every 2 s), WARN in yellow, ERROR in red |
+| Network | `network` | All interface addresses with family, netmask (IPv6 as prefix length) and internal flag |
+| Services | `services` | `launchctl list` (macOS) or `systemctl list-units` (Linux) as a table |
+| Settings | `settings` | Node version, server environment, client terminal type and the current session |
+
+Meters turn yellow from 75 % and red from 90 %. Results and errors (for
+example "Error fetching processes") appear in the status bar on the last row.
 
 ## Architecture
 
@@ -34,18 +41,20 @@ A terminal-based system monitoring dashboard accessible over SSH. Built with [ss
 src/
 ├── server/
 │   ├── index.js        # SSH server entry point (ssh2)
-│   ├── router.js       # Screen navigation and lifecycle management
+│   ├── router.js       # Hands each SSH shell to the Ink app (serve())
 │   └── session.js      # Session creation with fingerprint-based identity
-├── ui/
-│   ├── components.js   # Reusable blessed UI components
-│   ├── dashboard.js    # Main dashboard menu
-│   ├── overview.js     # System overview screen
-│   ├── processes.js    # Process monitor screen
-│   ├── resources.js    # CPU and memory screen
-│   ├── logs.js         # System logs screen
-│   ├── network.js      # Network interfaces screen
-│   ├── services.js     # Running services screen
-│   └── settings.js     # Environment and session info screen
+├── ui/                 # Ink screens (function components, no JSX)
+│   ├── app.js          # AdminApp: current screen, status message, menu selection, log
+│   ├── dashboard.js    # Home: menu + detail
+│   ├── overview.js     # System overview screen and summary
+│   ├── resources.js    # CPU & memory screen and summary
+│   ├── processes.js    # Processes screen and summary
+│   ├── logs.js         # Logs screen and summary
+│   ├── network.js      # Network screen and summary
+│   ├── services.js     # Services screen and summary
+│   ├── settings.js     # Settings screen and summary
+│   ├── parts.js        # Shared: label/value rows, meter tones, useData (live refresh), b/r keys
+│   └── tables.js       # ps / launchctl / systemctl output → table columns and rows
 └── models/
     └── system.js       # System data collection (os module, child_process)
 ```
@@ -93,35 +102,40 @@ If your shell does not auto-load Node/npm, use the local wrapper:
 
 ## Keyboard Controls
 
-All screens share a common set of keyboard shortcuts:
+The status bar on the last row lists the keys of the current screen.
 
 | Key | Action |
 |-----|--------|
-| Up/Down arrows | Navigate menu items |
-| Enter | Select menu item or activate button |
-| `r` | Refresh current screen data |
-| `b` or Escape | Go back to the dashboard menu |
-| `q` or Ctrl-C | Quit the application |
+| ↑↓ or `k`/`j` | Move in the menu; scroll tables and the log |
+| `1`-`7` | Jump to a menu item |
+| Enter | Open the highlighted item |
+| PgUp/PgDn, Home/End | Scroll a page, jump to the ends (End resumes following the log) |
+| `r` | Refresh the screen's data |
+| `b` or Escape | Back to the dashboard (the same item stays highlighted) |
+| `q` or Ctrl-C | Quit |
 
-## UI Components
+## UI
 
-The `UIComponents` class in `src/ui/components.js` provides factory methods for blessed widgets:
+The screens use the shared Ink package [`@shellcraft/ui`](../ui/README.md)
+(`file:../ui`, copied into `node_modules` by `install-links=true` in
+`.npmrc`, so there is one React). It provides `Screen` (title bar, body,
+status bar), `Panel`, `SelectList`, `Table`, `Meter`, `ScrollView`,
+`EmptyState`, the theme and the SSH adapter `serve()`. After changing
+`../ui`, refresh the copy with `./npmw ci`.
 
-- **`createBox`** -- Static content container with border
-- **`createList`** -- Selectable menu with keyboard and mouse support
-- **`createTable`** -- Data grid (blessed `listtable`)
-- **`createForm`** -- Input form container
-- **`createInput`** -- Text input field
-- **`createButton`** -- Clickable button with focus styling
-- **`showMessage`** -- Timed popup notification (info, success, error, warning)
+The home screen is the Figma template *Menu + detail* (page 04 Templates):
+`Admin › Dashboard` with the host name on the right, a 30-cell menu panel
+with focus, and the detail panel beside it.
 
 ## How Navigation Works
 
-The `CommandRouter` in `src/server/router.js` manages screen transitions:
-
-1. Each screen is a class that receives a `context` object with `screen`, `session`, and `navigate`.
-2. Calling `context.navigate('screenName')` tears down all current UI elements, clears key bindings, and instantiates the target screen class.
-3. The global quit handler (`q`, `Ctrl-C`) is re-registered after each navigation to ensure it is always available.
+`CommandRouter.handleConnection()` in `src/server/router.js` renders
+`AdminApp` on the SSH channel with `serve()` (alternate screen, resize on
+`window-change`, Ctrl-C, exit status 0). `AdminApp` holds the current screen
+and passes each screen a `ctx` with `navigate(name)`, `notify(tone, text)`
+for the status bar, the session and the `SystemModel`. A screen's refresh
+timer belongs to the screen, so it stops when you navigate away or
+disconnect.
 
 ## Session Data
 
@@ -136,7 +150,7 @@ Each SSH connection gets a session object containing:
 The `SystemModel` in `src/models/system.js` collects data from:
 
 - **`os.hostname()`**, **`os.platform()`**, **`os.arch()`** -- Host identification
-- **`os.cpus()`** -- Per-core CPU model and usage calculation
+- **`os.cpus()`** -- Per-core CPU model and usage, measured between two samples (the first since boot)
 - **`os.totalmem()`**, **`os.freemem()`** -- Memory statistics
 - **`os.uptime()`**, **`os.loadavg()`** -- System uptime and load averages
 - **`os.networkInterfaces()`** -- Network interface details
@@ -158,17 +172,23 @@ Logs shown on the Logs screen are simulated (randomly generated mock entries).
 ./npmw run test:e2e
 ```
 
-Tests use the Node.js built-in test runner (`node --test`). Test files are located in:
+Tests use the Node.js built-in test runner (`node --test`). The screen tests
+stub the `SystemModel`, so they do not depend on the machine. The e2e tests
+need a host key (`./npmw run generate-keys`). Test files are located in:
 
 ```
 test/
 ├── unit/
+│   ├── screens.test.js      # every screen at 80×24 and 100×30 (demo data)
+│   ├── ssh-adapter.test.js  # serve() on a fake SSH channel
+│   ├── tables.test.js       # ps / launchctl / systemctl parsing
 │   ├── session.test.js
 │   └── system.test.js
 ├── e2e/
 │   ├── server.test.js
 │   └── workflow.test.js
 └── helpers/
+    ├── demo-system.js       # SystemModel stub with fixed demo data
     └── test-utils.js
 ```
 
@@ -187,7 +207,8 @@ This uses nodemon to restart the server when source files change.
 | Package | Purpose |
 |---------|---------|
 | [ssh2](https://github.com/mscdex/ssh2) | SSH server implementation |
-| [blessed](https://github.com/chjj/blessed) | Terminal UI framework |
+| [`@shellcraft/ui`](../ui/README.md) | Shared Ink components, theme and SSH adapter |
+| [ink](https://github.com/vadimdemedes/ink), [react](https://react.dev) | Terminal UI |
 | [dotenv](https://github.com/motdotla/dotenv) | Environment variable loading |
 | [nanoid](https://github.com/ai/nanoid) | Session ID generation |
 

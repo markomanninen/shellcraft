@@ -1,623 +1,517 @@
-# Terminal App Template - Usage Guide
+# Usage Guide
 
-## 🎯 What is This?
+How to build and change a shellcraft app. For installing and running the
+apps, see [GETTING_STARTED.md](GETTING_STARTED.md). For the rules a screen
+follows, see [DESIGN_PRINCIPLES.md](DESIGN_PRINCIPLES.md). Every component
+and its props are in [ui/README.md](ui/README.md).
 
-A production-ready template for creating SSH-based terminal applications with beautiful TUI (Text User Interface).
+The examples use `React.createElement` (as `h`), like the apps: there is no
+JSX and no build step.
 
-## 📦 What This Template Provides
+## How an App Fits Together
 
-### Core Features
-
-1. **SSH Server** (`ssh2` library)
-   - Public key authentication
-   - Anonymous access support
-   - Secure connections
-
-2. **TUI Framework** (`blessed` library)
-   - Boxes, lists, tables, forms
-   - Navigation system
-   - Keyboard shortcuts
-   - Mouse support
-
-3. **Session Management**
-   - demo-shop / admin-dashboard: SSH public key fingerprint tracking (in-memory)
-   - adventure-game: Username-based sessions with JSON file persistence (`data/sessions.json`)
-   - Cart / game state persistence
-   - Session state
-
-4. **Example Application**
-   - Product catalog
-   - Shopping cart
-   - Checkout flow
-   - Complete navigation
-
-## 🚀 Quick Start
-
-### Command Convention (Repo Demos)
-
-For demo apps in this repository, use `./npmw ...` from the app directory.
-The wrapper auto-loads `nvm` when `node`/`npm` are missing from PATH.
-For generated apps, use plain `npm ...` commands (or load nvm first).
-
-### 1. Create a New Project
-
-```bash
-# Make the script executable (first time only)
-chmod +x init.sh
-
-# Create your project
-./init.sh my-awesome-app
-
-# Navigate to your project
-cd my-awesome-app
+```
+ssh client ──▶ src/server/index.js   SSH server, one session per connection
+                 │
+                 ▼
+               src/server/router.js  serve(stream, ptyInfo, h(App, { session }), { session: sshSession })
+                 │
+                 ▼
+               src/ui/app.js         current screen + status message, builds ctx
+                 │
+                 ▼
+               src/ui/<screen>.js    one Screen each: title bar, panels, status bar
 ```
 
-### 2. Install & Setup
+Every screen gets `ctx`:
 
-```bash
-# Install dependencies
-npm install
-
-# Generate SSH host keys
-npm run generate-keys
-
-# Copy environment configuration
-cp .env.example .env
-
-# Start the server
-npm start
+```js
+ctx.navigate('products');         // switch screen (clears the message)
+ctx.notify('success', 'Saved');   // status bar message; tones: info success warning error busy
+ctx.notify(null);                 // clear it
+ctx.setTyping(true);              // while a field is edited, q is just a letter
+ctx.quit();                       // end the SSH session
+ctx.session;                      // this connection: id, fingerprint, username, ...
 ```
 
-### 3. Connect
+demo-shop's `ctx` also has cart actions (`addToCart`, `clearCart`,
+`placeOrder`). Add your own actions to `ctx` in `src/ui/app.js`.
 
-```bash
-# In another terminal
-ssh localhost -p 2222
-```
+## Customizing a Generated App
 
-## 🎨 Customizing Your App
+- **App name**: `src/config.js` (`APP_NAME`, shown in every title bar).
+- **Menu**: the `MENU` array in `src/ui/home.js`. Each item has a `label`, a
+  `hint` (its number key) and the `screen` it opens.
+- **Products** (ecommerce): `src/models/product.js`.
+- **Session data**: `src/server/session.js`. Add fields to the object that
+  `createSession()` returns.
 
-### Modify the Home Screen
+## Adding a Screen
 
-Edit `src/ui/home.js`:
+1. Create `src/ui/report.js`:
 
-```javascript
-items: [
-  '📦 Browse Products',    // Change these menu items
-  '🛒 View Cart',
-  '💳 Checkout',
-  '🎮 Play Game',          // Add your own screens
-  '❌ Exit'
-]
-```
+```js
+import React from 'react';
+import { Screen, Panel, Text, useInput } from '@shellcraft/ui';
+import { APP_NAME } from '../config.js';
 
-### Add a New Screen
+const h = React.createElement;
 
-1. Create `src/ui/myscreen.js`:
+export function ReportScreen({ ctx }) {
+  useInput((input, key) => {
+    if (input === 'b' || key.escape) ctx.navigate('home');
+  });
 
-```javascript
-import { UIComponents } from './components.js';
-
-export class MyScreen {
-  constructor(context) {
-    this.context = context;
-    this.screen = context.screen;
-    this.render();
-  }
-
-  render() {
-    const box = UIComponents.createBox({
-      parent: this.screen,
-      top: 'center',
-      left: 'center',
-      width: '60%',
-      height: '60%',
-      content: '{center}{bold}My Custom Screen!{/}\n\n' +
-               '{center}Press ESC to go back',
-      tags: true
-    });
-
-    this.screen.key(['escape'], () => {
-      this.context.navigate('home');
-    });
-  }
+  return h(
+    Screen,
+    { app: APP_NAME, screen: 'Report', hints: [['b', 'back'], ['q', 'quit']], message: ctx.message },
+    h(Panel, { title: 'Report', focused: true }, h(Text, null, 'Nothing to report yet.'))
+  );
 }
 ```
 
-2. Register in `src/server/router.js`:
+2. Register it in `src/ui/app.js`:
 
-```javascript
-import { MyScreen } from '../ui/myscreen.js';
+```js
+import { ReportScreen } from './report.js';
 
-this.screens = {
+export const screens = {
   home: HomeScreen,
-  myscreen: MyScreen,  // Add your screen
+  report: ReportScreen,
   // ...
 };
 ```
 
-3. Add menu item in `src/ui/home.js`:
+3. Add a menu item in `src/ui/home.js`:
+   `{ label: 'Report', hint: '3', screen: 'report' }`. Update the `1-2 jump`
+   hint to `1-3 jump`.
 
-```javascript
-case 3:  // New menu option
-  this.context.navigate('myscreen');
-  break;
+4. Add a test in `test/unit/screens.test.js` (see [Testing a Screen](#testing-a-screen)).
+
+## Components by Example
+
+All of these come from `@shellcraft/ui`. So do Ink's `Box`, `Text`,
+`useInput` and `useApp`.
+
+### Menu + Detail
+
+A focused menu on the left, details on the right:
+
+```js
+const [index, setIndex] = useState(0);
+
+h(Box, { flexGrow: 1 },
+  h(Panel, { title: 'Menu', focused: true, width: 30, padding: 0 },
+    h(SelectList, {
+      items: [{ label: 'Products', hint: '1' }, { label: 'Cart', hint: '2' }],
+      selectedIndex: index,
+      onChange: setIndex,
+      onSelect: (i, item) => ctx.navigate(item.label.toLowerCase())
+    })),
+  h(Panel, { title: 'Details' }, h(Text, null, 'About the selected item')))
 ```
 
-### Change Products
+`SelectList` handles `↑↓`, `k` `j`, `⏎` and the number keys. Lists and tables
+use `padding: 0` on their panel so the selection bar reaches the border.
 
-Edit `src/models/product.js`:
+### Table
 
-```javascript
-this.products = [
-  {
-    id: 'prod_001',
-    name: 'Your Product Name',
-    description: 'Your description',
-    price: 29.99,
-    stock: 100
-  },
-  // Add more products...
+```js
+const COLUMNS = [
+  { label: 'Name', width: 24, grow: true },
+  { label: 'Price', width: 9, align: 'right' }
 ];
+const { rows } = useTerminalSize();
+
+h(Panel, { title: 'Products', focused: true, padding: 0 },
+  h(Table, {
+    columns: COLUMNS,
+    rows: products.map((p) => [p.name, `$${p.price.toFixed(2)}`]),
+    selectedIndex: index,
+    onChange: setIndex,
+    height: Math.max(rows - 5, 1)   // title bar, panel edges, header, status bar
+  }))
 ```
 
-## 🎯 Use Cases
+With `height`, long tables scroll and show `↑ N more` / `↓ N more`. Use
+`selectedIndex: -1` for a table without a selection bar.
 
-### 1. E-commerce Store
-- Sell products via terminal
-- Perfect for developer-focused products
-- Unique, memorable experience
+### Form
 
-### 2. Game Server
-- Text-based adventure games
-- MUD (Multi-User Dungeon)
-- Interactive fiction
+A form has two modes: pick a field with `↑↓`, edit it with `⏎`. While a field
+is being edited, tell the app so `q` is not "quit":
 
-### 3. Admin Dashboard
-- Server monitoring
-- Database management
-- Log viewing
-
-### 4. API Client
-- Interactive API explorer
-- Testing tool
-- Development utility
-
-### 5. Information Kiosk
-- Documentation browser
-- Support system
-- Knowledge base
-
-## 🎨 UI Component Examples
-
-### Create a Menu
-
-```javascript
-const menu = UIComponents.createList({
-  parent: screen,
-  top: 5,
-  left: 'center',
-  width: '50%',
-  height: 10,
-  items: ['Option 1', 'Option 2', 'Option 3']
-});
-
-menu.on('select', (item, index) => {
-  // Handle selection
-});
+```js
+h(TextField, {
+  label: 'Email',
+  placeholder: 'you@example.com',
+  value: editing ? draft : form.email,
+  error: errors.email,            // shown as "✗ message" under the field
+  focused: focus === 1,
+  editing,
+  onChange: setDraft,
+  onSubmit: (value) => { save(value); setEditing(false); ctx.setTyping(false); },
+  onCancel: () => { setEditing(false); ctx.setTyping(false); }
+})
+h(Button, { label: 'Place order', focused: focus === 3 })
 ```
 
-### Create a Form
+`demo-shop/src/ui/checkout.js` is a complete form with validation.
 
-```javascript
-const form = UIComponents.createForm({
-  parent: screen,
-  top: 5,
-  left: 'center',
-  width: '60%',
-  height: 15
-});
+### Messages
 
-const input = UIComponents.createInput({
-  parent: form,
-  top: 1,
-  left: 2,
-  width: '90%',
-  height: 3,
-  label: ' Username '
-});
+Results go to the status bar, never into a box over the screen:
 
-form.on('submit', (data) => {
-  console.log('Submitted:', data);
-});
+```js
+ctx.notify('success', 'Added Developer Blend to cart');  // ✓ green
+ctx.notify('warning', 'Cart is empty');                   // ! yellow
+ctx.notify('error', 'Fix 1 field before ordering');       // ✗ red
+ctx.notify('busy', 'Loading products');                   // spinner
 ```
 
-### Create a Table
+### Scrolling Text
 
-```javascript
-const table = UIComponents.createTable({
-  parent: screen,
-  top: 5,
-  left: 2,
-  width: '96%',
-  height: 15,
-  data: [
-    ['Name', 'Age', 'City'],
-    ['John', '30', 'NYC'],
-    ['Jane', '25', 'SF']
-  ]
-});
+```js
+h(Panel, { title: 'Log', focused: true },
+  h(ScrollView, { lines: logLines, follow: true }))   // follow: stay at the end
 ```
 
-### Show a Message
+`lines` items can be strings or `{ text, tone, bold, hangingIndent }`.
 
-```javascript
-UIComponents.showMessage(screen, 'Success!', 'success');
-// Types: 'info', 'success', 'error', 'warning'
+### Meters and Empty States
+
+```js
+h(Meter, { label: 'CPU', value: 42, tone: 'default' })   // tone: default | warning | danger
+h(EmptyState, { message: 'Your cart is empty.', hint: 'Browse products and press', k: 'a', label: 'add to cart' })
 ```
 
-## 🔐 Authentication
+## Keyboard Input
 
-The example apps demonstrate two different session identification strategies.
+Use Ink's `useInput` in the screen:
 
-### Fingerprint-Based Identity (demo-shop / admin-dashboard)
+```js
+useInput((input, key) => {
+  if (input === 'a') addItem();
+  else if (key.return) open();
+  else if (key.upArrow) move(-1);
+  else if (input === 'b' || key.escape) ctx.navigate('home');
+}, { isActive: !editing });
+```
 
-Sessions are identified by the MD5 hash of the user's SSH public key. This is
-purely in-memory and resets when the server restarts.
+- `app.js` handles `q`. `serve()` handles Ctrl-C.
+- When two parts of a screen read keys, give `isActive` to the focused one only.
+- Show every key that works in the status bar hints.
 
-```javascript
-// demo-shop & admin-dashboard — SessionManager.createSession(publicKey)
-const fingerprint = publicKey
-  ? crypto.createHash('md5').update(publicKey.data).digest('hex')
-  : 'anonymous';
+## Live Data
 
-const session = { id, fingerprint, createdAt: new Date(), cart: [] };
+Refresh on a timer with `useInterval`. It stops when the screen unmounts or
+the user disconnects:
 
-// In your screen code:
-const fingerprint = this.context.session.fingerprint;
+```js
+const [stats, setStats] = useState(readStats);
+useInterval(() => setStats(readStats()), 2000);
+```
 
-if (fingerprint === 'anonymous') {
-  // User connected without SSH key
-} else {
-  // User has a unique fingerprint derived from their public key
+## Authentication
+
+The apps show two ways to recognize a user.
+
+### SSH key fingerprint (demo-shop, admin-dashboard, generated apps)
+
+The server keeps the client's public key and the session stores a
+fingerprint. Users without a key get `'anonymous'`. Sessions live in memory
+and end with the connection.
+
+```js
+import { fingerprintOf } from '@shellcraft/ui/auth';
+
+// OpenSSH style, as `ssh-keygen -l` shows it: "SHA256:..."
+const fingerprint = fingerprintOf(publicKey); // 'anonymous' without a key
+
+if (ctx.session.fingerprint === 'anonymous') {
+  // connected without an SSH key
 }
 ```
 
-### Username-Based Identity (adventure-game)
+Every SSH app signs users in with `authenticate()` from
+`@shellcraft/ui/auth` (a generated app wraps it in `src/server/auth.js`):
 
-Sessions are keyed by the SSH username (`ssh <username>@host`). Game state is
-persisted to a JSON file so players can reconnect and resume.
+| Method | Answer |
+|---|---|
+| `publickey` | any key, if the signature proves the client holds it; the key becomes the fingerprint |
+| `keyboard-interactive` | accepted without prompts: an anonymous session |
+| `none`, `password`, others | rejected; the server offers the two methods above |
 
-```javascript
-// adventure-game — SessionManager.createSession(username)
-// Looks up an existing session by username; creates a new one if none found.
-const session = sessionManager.createSession(username); // e.g. 'alice'
+OpenSSH tries `none` first. A server that accepts `none` lets everyone in
+before they offer a key, so every session is anonymous. ssh2 does not check
+key signatures itself; `authenticate()` does, with
+`utils.parseKey(ctx.key.data)` and
+`key.verify(ctx.blob, ctx.signature, ctx.hashAlgo)`. ssh2 clients without a
+key need `tryKeyboard: true` and a `'keyboard-interactive'` handler that
+answers `finish([])`.
 
-// Game state is automatically saved to data/sessions.json
-// and restored on the next connection with the same username.
+### SSH user name (adventure-game)
+
+Sessions are keyed by the SSH user name (`ssh alice@host -p 2222`). The game
+state is saved to `data/sessions.json`, so a player can reconnect and continue.
+
+```js
+const session = sessionManager.createSession(username); // finds or creates 'alice'
 ```
 
-### Store User Data
+### Real authentication
 
-```javascript
-// In session (temporary)
-this.context.session.user = {
-  name: 'John Doe',
-  email: 'john@example.com'
-};
+The demo apps and generated apps let everyone in. Before you deploy, check
+credentials in the authentication handler (`src/server/auth.js` in a
+generated app, `client.on('authentication', ...)` in `src/server/index.js` in
+the demo apps). For keys, allow only known ones and no anonymous users:
 
-// In database (persistent)
-// Use your preferred database library
+```js
+const allowed = new Set(['SHA256:...']);
+authenticate(ctx, onKey, { anonymous: false, allowKey: (key) => allowed.has(fingerprintOf(key)) });
 ```
 
-## 🌐 API Integration
+For passwords:
 
-### Fetch Data
+```js
+client.on('authentication', (ctx) => {
+  if (ctx.method === 'password'
+      && ctx.username === process.env.ADMIN_USER
+      && ctx.password === process.env.ADMIN_PASS) {
+    return ctx.accept();
+  }
+  ctx.reject(['password']);
+});
+```
 
-```javascript
-async fetchProducts() {
+Use a constant-time comparison and real secrets in production.
+
+## API Integration
+
+Show a busy message while waiting, then the result:
+
+```js
+async function loadProducts(ctx, setProducts) {
+  ctx.notify('busy', 'Loading products');
   try {
     const response = await fetch('https://api.example.com/products');
-    const products = await response.json();
-    return products;
+    setProducts(await response.json());
+    ctx.notify(null);
   } catch (error) {
-    UIComponents.showMessage(this.screen, 'Failed to load products', 'error');
+    ctx.notify('error', 'Could not load products');
   }
 }
+
+// in the screen
+useEffect(() => { loadProducts(ctx, setProducts); }, []);
 ```
 
-### Use in Screen
+## LLM Integration (Ollama)
 
-```javascript
-export class ProductsScreen {
-  async render() {
-    const products = await this.fetchProducts();
-    // Display products...
-  }
-}
-```
-
-## 🤖 LLM Integration (Ollama)
-
-The `adventure-game` example includes a full LLM integration that connects to a
-local [Ollama](https://ollama.com/) instance to power a dynamic game master.
-You can reuse this pattern in your own apps.
-
-### Architecture
+adventure-game talks to a local [Ollama](https://ollama.com/) server for its
+Game Master. You can reuse the pattern.
 
 ```
 ┌──────────────┐      ┌────────────────┐      ┌──────────────────┐
-│  UI (room.js)│─────▶│ LLMGameEngine  │─────▶│  OllamaClient    │
+│  room screen │─────▶│ LLMGameEngine  │─────▶│  OllamaClient    │
 │  user action │      │ prompt + parse │      │  HTTP → Ollama   │
 └──────────────┘      └────────────────┘      └──────────────────┘
 ```
 
-1. **OllamaClient** (`src/llm/ollama-client.js`) — thin HTTP wrapper around
-   the Ollama `/api/chat` endpoint with configurable model, base URL, and
-   timeout.
-2. **LLMGameEngine** (`src/llm/game-engine.js`) — builds a system prompt from
-   the game world seed, manages conversation history, and parses the structured
-   JSON responses the model returns.
+1. **OllamaClient** (`src/llm/ollama-client.js`): a small HTTP wrapper around
+   Ollama's `/api/chat`, with model, base URL and timeout settings.
+2. **LLMGameEngine** (`src/llm/game-engine.js`): builds the prompt from the
+   game state, keeps the conversation and parses the JSON the model returns.
 
-### Configuration
-
-Set these in your `.env` (or environment):
+Settings in `.env`:
 
 ```bash
-OLLAMA_BASE_URL=http://localhost:11434   # Ollama server address
-OLLAMA_MODEL=qwen3-coder:30b            # Any Ollama-compatible model
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=qwen3-coder:30b
 ```
 
-### Quick Example
-
-```javascript
+```js
 import { OllamaClient } from './llm/ollama-client.js';
 
-const client = new OllamaClient();          // reads env vars automatically
-
-// Check if Ollama is reachable
+const client = new OllamaClient();   // reads the env variables
 if (await client.isAvailable()) {
   const result = await client.chat([
     { role: 'system', content: 'You are a helpful assistant.' },
-    { role: 'user',   content: 'Describe this room in two sentences.' }
+    { role: 'user', content: 'Describe this room in two sentences.' }
   ], { temperature: 0.8, maxTokens: 256 });
-
   console.log(result.message.content);
 }
 ```
 
-The adventure-game gracefully falls back to a static room model when Ollama is
-not running, so the app remains functional without an LLM.
+The game rules run without the LLM; the LLM only narrates. See
+`adventure-game/README.md` for the details.
 
-## 🗄️ Database Integration
+## Database Integration
 
-### SQLite Example
+SQLite example:
 
 ```bash
 npm install better-sqlite3
 ```
 
-```javascript
+```js
 import Database from 'better-sqlite3';
 
 const db = new Database('data/shop.db');
+db.exec(`CREATE TABLE IF NOT EXISTS orders (
+  id INTEGER PRIMARY KEY,
+  user_fingerprint TEXT,
+  total REAL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+)`);
 
-// Create table
-db.exec(`
-  CREATE TABLE IF NOT EXISTS orders (
-    id INTEGER PRIMARY KEY,
-    user_fingerprint TEXT,
-    total REAL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  )
-`);
-
-// Insert
-const insert = db.prepare('INSERT INTO orders (user_fingerprint, total) VALUES (?, ?)');
-insert.run(fingerprint, total);
-
-// Query
+db.prepare('INSERT INTO orders (user_fingerprint, total) VALUES (?, ?)').run(fingerprint, total);
 const orders = db.prepare('SELECT * FROM orders WHERE user_fingerprint = ?').all(fingerprint);
 ```
 
-## 🎨 Styling Tips
+## Colors and Styling
 
-### Colors
+Screens do not name colors. They use theme tokens through the helpers:
 
-```javascript
-style: {
-  fg: 'white',        // foreground
-  bg: 'blue',         // background
-  border: { fg: 'cyan' },
-  selected: { bg: 'blue', fg: 'white' },
-  focus: { border: { fg: 'yellow' } }
-}
+```js
+import { textProps, borderProps } from '@shellcraft/ui';
+
+h(Text, textProps('muted'), 'a hint')          // dim default color
+h(Text, textProps('success'), 'Saved')         // green
+h(Box, { borderStyle: 'round', ...borderProps('focus') })   // cyan border
 ```
 
-### Formatting with Tags
+Text tokens: `default`, `muted`, `accent`, `success`, `warning`, `danger`,
+`onAccent`. Border tokens: `default`, `focus`, `danger`. All colors are the
+16 ANSI colors, so they follow the user's terminal theme. To change the look
+of every app, change `ui/src/theme.js` (in a generated app,
+`vendor/ui/src/theme.js`).
 
-```javascript
-content: '{center}{bold}{cyan-fg}Title{/}\n' +
-         '{red-fg}Error message{/}\n' +
-         '{green-fg}Success!{/}',
-tags: true  // Enable tag parsing
-```
+## Testing a Screen
 
-### Available Colors
+```js
+import { renderTerminal, cleanupTerminals, styleAt, boldDimText, tick } from '@shellcraft/ui/testing';
 
-`black`, `red`, `green`, `yellow`, `blue`, `magenta`, `cyan`, `white`,
-`gray`, `lightred`, `lightgreen`, `lightyellow`, `lightblue`, `lightmagenta`, `lightcyan`
+afterEach(() => cleanupTerminals());
 
-## ⌨️ Keyboard Shortcuts
-
-### Standard Bindings
-
-```javascript
-// Single key
-screen.key(['q'], () => { /* quit */ });
-
-// Multiple keys
-screen.key(['q', 'C-c'], () => { /* quit */ });
-
-// With modifiers
-screen.key(['C-x'], () => { /* Ctrl+X */ });
-screen.key(['M-x'], () => { /* Alt+X */ });
-
-// Arrow keys
-screen.key(['up', 'down', 'left', 'right'], (ch, key) => {
-  console.log('Arrow key:', key.name);
+it('report screen', async () => {
+  const session = new SessionManager().createSession(null);
+  const t = renderTerminal(h(App, { session, initialScreen: 'report' }), { columns: 80, rows: 24 });
+  await tick(20);
+  assert.ok(t.lines()[0].startsWith(` ${APP_NAME} › Report`));
+  assert.equal(t.lines().at(-1), ' b back  q quit');
+  assert.equal(boldDimText(t.lastFrame()), '');
+  await t.press('b');
+  assert.ok(t.lines()[0].includes('Home'));
 });
 ```
 
-## 🚢 Deployment
+More in [TESTING_SUMMARY.md](TESTING_SUMMARY.md).
 
-> **Important:** Authentication is disabled by default in all three example apps
-> so that anyone can connect without an SSH key or password. This is intentional
-> for demo/development purposes. For any production deployment you **MUST**
-> configure proper authentication (public key verification, password checks, or
-> both) in the `client.on('authentication', ...)` handler inside
-> `src/server/index.js`. See the [Custom Authentication](#-advanced-topics)
-> section for an example.
+## Deployment
+
+> **Important:** the demo apps and generated apps accept anonymous
+> connections. Add [real authentication](#real-authentication) before you
+> deploy anything that others can reach.
 
 ### Development
 
 ```bash
-npm run dev  # Auto-reload on changes
+npm run dev   # restart on changes (nodemon)
 ```
 
-### Production with PM2
+### PM2
 
 ```bash
 npm install -g pm2
 pm2 start src/server/index.js --name my-terminal-app
-pm2 startup  # Start on system boot
+pm2 startup   # start on boot
 pm2 save
 ```
 
+PM2 runs the server without a TTY. That is fine: `@shellcraft/ui` sends
+colors to SSH clients either way.
+
 ### Docker
 
+For a generated app (it has `vendor/ui` and a `.dockerignore`):
+
 ```dockerfile
-FROM node:20-alpine
+FROM node:24-alpine
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci --production
+COPY vendor ./vendor
+RUN npm ci --omit=dev
 COPY . .
-RUN npm run generate-keys
 EXPOSE 2222
 CMD ["npm", "start"]
 ```
 
 ```bash
 docker build -t my-terminal-app .
-docker run -p 2222:2222 my-terminal-app
+docker run -p 2222:2222 -v "$PWD/keys:/app/keys:ro" my-terminal-app
 ```
+
+Mount the host key instead of baking it into the image. A new key on every
+build makes SSH clients warn that the host changed.
 
 ### Public Access
 
-To allow external SSH connections:
+1. Open port 2222 in the firewall.
+2. Forward port 2222 on the router to the server.
+3. Listen on all interfaces: `SSH_HOST=0.0.0.0` (the default).
+4. Connect: `ssh your-domain.com -p 2222`.
 
-1. **Open firewall port**: 2222
-2. **Configure router**: Port forward 2222 to your server
-3. **Update `.env`**: Bind to 0.0.0.0 (default)
-4. **Connect**: `ssh your-domain.com -p 2222`
+## Troubleshooting
 
-## 🐛 Troubleshooting
+| Problem | Cause and fix |
+|---|---|
+| `Connection refused` | The server is not running, or runs on another port. Check `lsof -i :2222`. |
+| `Host key not found` | Run `npm run generate-keys`. |
+| Rows start further and further right (staircase) | Output reaches the client without `\r\n`. Render through `serve()`, not Ink's `render()`. |
+| No colors over SSH | `FORCE_COLOR=0` or `NO_COLOR` is set for the server. Unset it. |
+| The screen scrolls or flickers on every key | The UI is taller than the terminal. Wrap each screen in one `Screen`, which is exactly the terminal's height. |
+| A key does nothing | Another component holds the keys: only the focused list should have `isActive`. While `ctx.setTyping(true)` is on, `q` is text. |
+| `Invalid hook call` | Two copies of React. `npm ls react` must show one `react@19`. Run `npm ci`. |
+| A change in `ui/` does not show in a demo app | npm copied `ui/` into `node_modules`. Run `./npmw ci` in the app. |
+| `node` too old | Ink 8 needs Node 22 or newer. |
 
-### Connection Refused
+## Advanced Topics
 
-```bash
-# Check if server is running
-ps aux | grep node
+### Several Apps on One Machine
 
-# Check port availability
-lsof -i :2222
-```
-
-### Screen Not Rendering
-
-```javascript
-// Always call screen.render() after changes
-screen.render();
-
-// Destroy old elements before creating new ones
-screen.children.forEach(child => child.destroy());
-```
-
-### Keys Not Working
-
-```javascript
-// Ensure element is focused
-element.focus();
-
-// Check key bindings
-screen.key(['your-key'], () => {
-  console.log('Key pressed!');
-});
-```
-
-## 📚 Advanced Topics
-
-### Custom Authentication
-
-```javascript
-client.on('authentication', (ctx) => {
-  if (ctx.method === 'password') {
-    // EXAMPLE ONLY - use environment variables in production!
-    if (ctx.username === process.env.ADMIN_USER && ctx.password === process.env.ADMIN_PASS) {
-      ctx.accept();
-    } else {
-      ctx.reject();
-    }
-  }
-});
-```
-
-### Multiple Servers
-
-```javascript
-// Different ports for different apps
-const shopServer = new TerminalServer(2222);
-const adminServer = new TerminalServer(2223);
-```
+Give each app its own port in its `.env`: `SSH_PORT=2222`, `SSH_PORT=2223`, ...
 
 ### Logging
 
-```javascript
+```js
 import fs from 'fs';
 
 const log = (message) => {
-  const timestamp = new Date().toISOString();
-  fs.appendFileSync('logs/app.log', `[${timestamp}] ${message}\n`);
+  fs.appendFileSync('logs/app.log', `[${new Date().toISOString()}] ${message}\n`);
 };
 ```
 
-## 🎓 Learning Resources
+Do not `console.log` from a screen: the server's stdout is not the user's
+terminal. Use the status bar for the user and a log file for yourself.
 
-- **SSH2**: https://github.com/mscdex/ssh2
-- **Blessed**: https://github.com/chjj/blessed
-- **Node.js**: https://nodejs.org/docs
+## Use Cases and Ideas
 
-## 💡 Project Ideas
+- **Shops** for developer products (see demo-shop)
+- **Games**: text adventures, MUDs, interactive fiction (see adventure-game)
+- **Admin tools**: monitoring, log viewing, database tools (see admin-dashboard)
+- **API clients**: explore and test an API from the terminal
+- **Kiosks**: documentation browsers, support desks, knowledge bases
+- **Small tools**: todo lists, ticket queues, snippet managers, chat rooms
 
-1. **Dev Tools Shop** - Sell licenses for developer tools
-2. **Book Store** - Sell ebooks with terminal interface
-3. **Ticket System** - Support ticket management
-4. **Game Server** - Text-based multiplayer game
-5. **News Reader** - RSS/news aggregator
-6. **Weather App** - Weather dashboard
-7. **Todo Manager** - Task management system
-8. **Chat Server** - Terminal chat application
-9. **File Browser** - Remote file management
-10. **Code Snippet Manager** - Share and browse code snippets
+## Resources
 
-## 🤝 Contributing
+- [Ink](https://github.com/vadimdemedes/ink)
+- [ssh2](https://github.com/mscdex/ssh2)
+- [Node.js docs](https://nodejs.org/docs)
+- [ui/README.md](ui/README.md): components, theme, `serve()`, test helpers
+- [Figma: shellcraft](https://www.figma.com/design/oykSSRdp0xDbaot7ZkLFQc)
 
-Found a bug or have an improvement? Contributions welcome!
+## License
 
-## 📄 License
-
-MIT - Use this template for any project, commercial or personal!
-
----
-
-**Happy Hacking! 🚀**
+MIT: use this template for any project, commercial or personal.

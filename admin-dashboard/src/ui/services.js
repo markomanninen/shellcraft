@@ -1,83 +1,64 @@
-import { UIComponents } from './components.js';
-import { SystemModel } from '../models/system.js';
+import React from 'react';
+import { Box, Text, Panel, Table, ScrollView, EmptyState, useTerminalSize, BlankRow, infoRows, useData } from '@shellcraft/ui';
+import { AdminScreen, loadMessage, screenHints, useScreenKeys, SUMMARY_LABEL_WIDTH } from './parts.js';
+import { parseServices } from './tables.js';
 
-export class ServicesScreen {
-  constructor(context) {
-    this.context = context;
-    this.screen = context.screen;
-    this.systemModel = new SystemModel();
-    this.render();
-  }
+const h = React.createElement;
 
-  async render() {
-    const header = UIComponents.createBox({
-      parent: this.screen,
-      top: 0,
-      left: 0,
-      width: '100%',
-      height: 3,
-      content: '{center}{bold}{green-fg}SERVICES STATUS{/}',
-      tags: true
-    });
+/**
+ * The model's service listing, parsed: { services } or { failure } with the
+ * model's own text ("Error fetching services", "not available on this
+ * platform") when it is not launchctl / systemctl output.
+ */
+export function useServices(ctx) {
+  const state = useData(() => ctx.system.getServices());
+  const services = state.data === undefined ? undefined : parseServices(state.data);
+  const failure = state.error ?? (state.data !== undefined && services === null ? String(state.data).trim() : null);
+  return { ...state, services, failure };
+}
 
-    const loading = UIComponents.createBox({
-      parent: this.screen,
-      top: 'center',
-      left: 'center',
-      width: 40,
-      height: 5,
-      content: '{center}Loading services...{/}',
-      tags: true
-    });
+/** Home detail panel for "Services": how many, then their names. */
+export function ServicesSummary({ ctx }) {
+  const { services, failure } = useServices(ctx);
+  if (failure) return h(EmptyState, { message: failure });
+  if (services === undefined) return null;
+  return h(
+    Box,
+    { flexDirection: 'column', flexGrow: 1 },
+    ...infoRows([
+      ['Listed', `${services.rows.length} services`],
+      ['Manager', services.manager]
+    ], SUMMARY_LABEL_WIDTH),
+    h(BlankRow),
+    h(ScrollView, {
+      rows: services.names.map((name) => h(Text, { wrap: 'truncate-end' }, name)),
+      isActive: false
+    })
+  );
+}
 
-    this.screen.render();
+/** Services: launchctl (macOS) or systemctl (Linux) as a table. r refreshes. */
+export function ServicesScreen({ ctx }) {
+  const state = useServices(ctx);
+  const { services, failure, refresh } = state;
+  useScreenKeys(ctx, refresh);
+  const { rows } = useTerminalSize();
+  // Title bar, panel top, table header, panel bottom, status bar.
+  const height = Math.max(rows - 5, 1);
 
-    const services = await this.systemModel.getServices();
+  let body = null;
+  if (failure) body = h(EmptyState, { message: 'No service list.', hint: 'Try again:', k: 'r', label: 'refresh' });
+  else if (services && services.rows.length === 0) body = h(EmptyState, { message: 'No running services listed.' });
+  else if (services) body = h(Table, { columns: services.columns, rows: services.rows, selectedIndex: -1, height });
 
-    loading.destroy();
-
-    const serviceBox = UIComponents.createBox({
-      parent: this.screen,
-      top: 4,
-      left: 2,
-      width: '96%',
-      height: '80%',
-      label: ' Running Services ',
-      content: services,
-      scrollable: true,
-      alwaysScroll: true,
-      scrollbar: {
-        ch: ' ',
-        style: { bg: 'cyan' }
-      },
-      style: {
-        border: { fg: 'green' }
-      }
-    });
-
-    const backBtn = UIComponents.createButton({
-      parent: this.screen,
-      bottom: 3,
-      left: 'center',
-      width: 15,
-      height: 3,
-      content: ' Back ',
-      name: 'back'
-    });
-
-    backBtn.on('press', () => {
-      this.context.navigate('dashboard');
-    });
-
-    this.screen.key(['r'], () => {
-      this.context.navigate('services');
-    });
-
-    this.screen.key(['b', 'escape'], () => {
-      this.context.navigate('dashboard');
-    });
-
-    this.screen.render();
-    backBtn.focus();
-  }
+  return h(
+    AdminScreen,
+    {
+      ctx,
+      screen: 'Services',
+      hints: screenHints({ scroll: (services?.rows.length ?? 0) > height, refresh: true }),
+      message: failure ? { tone: 'error', text: failure } : loadMessage(state, 'services')
+    },
+    h(Panel, { title: 'Services', focused: true, padding: 0 }, body)
+  );
 }

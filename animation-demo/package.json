@@ -4,11 +4,20 @@
   "description": "ASCII animation showcase for terminal loading screens",
   "main": "index.js",
   "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "start": "node index.js",
-    "test": "echo \"Animation demo has no tests\" && exit 0"
+    "test": "node --test --test-timeout=30000 --test-force-exit test/*.test.js"
   },
   "dependencies": {
-    "blessed": "^0.1.81"
-  }
+    "@shellcraft/ui": "file:../ui",
+    "ink": "^8.0.0",
+    "react": "^19.3.1"
+  },
+  "devDependencies": {
+    "@xterm/headless": "^6.0.0"
+  },
+  "license": "MIT"
 }

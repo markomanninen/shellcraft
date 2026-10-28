@@ -1,109 +1,76 @@
-import { UIComponents } from './components.js';
-import { SystemModel } from '../models/system.js';
+import React from 'react';
+import { Box, Panel, Meter, BlankRow, infoRows, useData } from '@shellcraft/ui';
+import { AdminScreen, meterTone, screenHints, useScreenKeys, SUMMARY_LABEL_WIDTH, LABEL_WIDTH } from './parts.js';
 
-export class OverviewScreen {
-  constructor(context) {
-    this.context = context;
-    this.screen = context.screen;
-    this.systemModel = new SystemModel();
-    this.render();
-  }
+const h = React.createElement;
 
-  render() {
-    const header = UIComponents.createBox({
-      parent: this.screen,
-      top: 0,
-      left: 0,
-      width: '100%',
-      height: 3,
-      content: '{center}{bold}{green-fg}SYSTEM OVERVIEW{/}',
-      tags: true
-    });
+/** Everything the overview shows, sampled at once. */
+export function overviewData(system) {
+  return {
+    info: system.getSystemInfo(),
+    memory: system.getMemoryUsage(),
+    cpu: system.getCPUPercent()
+  };
+}
 
-    const info = this.systemModel.getSystemInfo();
+/** The CPU and memory meters (tone warning ≥ 75 %, danger ≥ 90 %). */
+export function UsageMeters({ cpu, memory }) {
+  return h(
+    Box,
+    { flexDirection: 'column', flexShrink: 0 },
+    h(Meter, { label: 'CPU', value: cpu, tone: meterTone(cpu) }),
+    h(Meter, { label: 'Memory', value: memory.usedPercent, tone: meterTone(memory.usedPercent) })
+  );
+}
 
-    const infoBox = UIComponents.createBox({
-      parent: this.screen,
-      top: 4,
-      left: 2,
-      width: '48%',
-      height: 14,
-      label: ' System Information ',
-      content: `
-  {bold}Hostname:{/}     ${info.hostname}
-  {bold}Platform:{/}     ${info.platform}
-  {bold}Architecture:{/} ${info.arch}
-  {bold}CPUs:{/}         ${info.cpus} cores
-  {bold}Total Memory:{/} ${info.totalMemory}
-  {bold}Free Memory:{/}  ${info.freeMemory}
-  {bold}Uptime:{/}       ${info.uptime}
-`,
-      tags: true,
-      style: {
-        border: { fg: 'cyan' }
-      }
-    });
+/** Home detail panel for "System overview" (the Figma Menu + detail template). */
+export function OverviewSummary({ ctx }) {
+  const { data } = useData(() => overviewData(ctx.system), { interval: ctx.refreshMs });
+  const { info, memory, cpu } = data;
+  return h(
+    Box,
+    { flexDirection: 'column' },
+    ...infoRows([
+      ['Hostname', info.hostname],
+      ['Platform', `${info.platform} ${info.arch}`],
+      ['CPUs', `${info.cpus} cores`],
+      ['Uptime', info.uptime],
+      ['Load', info.loadAvg.join('  ')]
+    ], SUMMARY_LABEL_WIDTH),
+    h(BlankRow),
+    h(UsageMeters, { cpu, memory })
+  );
+}
 
-    const loadBox = UIComponents.createBox({
-      parent: this.screen,
-      top: 4,
-      right: 2,
-      width: '48%',
-      height: 14,
-      label: ' Load Average ',
-      content: `
-  {bold}1 min:{/}  ${info.loadAvg[0]}
-  {bold}5 min:{/}  ${info.loadAvg[1]}
-  {bold}15 min:{/} ${info.loadAvg[2]}
+/** System overview: host, uptime, load and memory; refreshes every 2 s. */
+export function OverviewScreen({ ctx }) {
+  const { data, refresh } = useData(() => overviewData(ctx.system), { interval: ctx.refreshMs });
+  useScreenKeys(ctx, refresh);
+  const { info, memory, cpu } = data;
 
-  {yellow-fg}Press 'r' to refresh{/}
-`,
-      tags: true,
-      style: {
-        border: { fg: 'yellow' }
-      }
-    });
-
-    const memory = this.systemModel.getMemoryUsage();
-
-    const memBox = UIComponents.createBox({
-      parent: this.screen,
-      bottom: 8,
-      left: 'center',
-      width: '96%',
-      height: 6,
-      label: ' Memory Usage ',
-      content: `
-  {bold}Total:{/} ${memory.total}  |  {bold}Used:{/} ${memory.used}  |  {bold}Free:{/} ${memory.free}  |  {bold}Usage:{/} ${memory.percent}
-`,
-      tags: true,
-      style: {
-        border: { fg: 'magenta' }
-      }
-    });
-
-    const backBtn = UIComponents.createButton({
-      parent: this.screen,
-      bottom: 3,
-      left: 'center',
-      width: 15,
-      height: 3,
-      content: ' Back ',
-      name: 'back'
-    });
-
-    backBtn.on('press', () => {
-      this.context.navigate('dashboard');
-    });
-
-    this.screen.key(['r'], () => {
-      this.context.navigate('overview');
-    });
-
-    this.screen.key(['b', 'escape'], () => {
-      this.context.navigate('dashboard');
-    });
-
-    backBtn.focus();
-  }
+  return h(
+    AdminScreen,
+    { ctx, screen: 'System overview', hints: screenHints({ refresh: true }) },
+    h(
+      Panel,
+      { title: 'System overview', focused: true },
+      ...infoRows([
+        ['Hostname', info.hostname],
+        ['Platform', info.platform],
+        ['Architecture', info.arch],
+        ['CPUs', `${info.cpus} cores`],
+        ['Uptime', info.uptime],
+        null,
+        ['Load 1 min', info.loadAvg[0]],
+        ['Load 5 min', info.loadAvg[1]],
+        ['Load 15 min', info.loadAvg[2]],
+        null,
+        ['Total memory', memory.total],
+        ['Used memory', memory.used],
+        ['Free memory', memory.free]
+      ], LABEL_WIDTH),
+      h(BlankRow),
+      h(UsageMeters, { cpu, memory })
+    )
+  );
 }

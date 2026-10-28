@@ -1,139 +1,77 @@
-import { UIComponents } from './components.js';
+import React from 'react';
+import { Screen, Panel, ScrollView } from '@shellcraft/ui';
+import { APP_NAME, NoGame, BACK_HINTS, SCROLL_HINTS, useBackKeys, gameMeta } from './components.js';
+import { storyOf, journalEntries } from './turn.js';
 
-export class JournalScreen {
-  constructor(context) {
-    this.context = context;
-    this.screen = context.screen;
-    this.render();
+const h = React.createElement;
+
+const QUEST_TONES = { completed: 'success', active: 'default', locked: 'muted' };
+
+const signed = (n) => (n > 0 ? `+${n}` : String(n));
+
+/**
+ * The journal as ScrollView lines: quests, encounters, factions, NPC
+ * memory and the turn log. Headings bold; details indented, and wrapped
+ * lines keep their indent.
+ */
+export function journalLines(gameState) {
+  const { quests, encounters, factions, npcs } = gameState.worldState;
+  const lines = [{ text: 'Quests', bold: true }];
+  for (const quest of Object.values(quests)) {
+    lines.push({
+      text: `  ${quest.title} · ${quest.status} · ${Math.round(quest.progress)}%`,
+      tone: QUEST_TONES[quest.status] ?? 'default'
+    });
+    lines.push({ text: `    ${quest.description}`, tone: 'muted' });
   }
 
-  bindScrollKeys(box) {
-    this.screen.key(['up'], () => {
-      box.scroll(-1);
-      this.screen.render();
-    });
-    this.screen.key(['down'], () => {
-      box.scroll(1);
-      this.screen.render();
-    });
-    this.screen.key(['pageup'], () => {
-      box.scroll(-6);
-      this.screen.render();
-    });
-    this.screen.key(['pagedown'], () => {
-      box.scroll(6);
-      this.screen.render();
-    });
-    this.screen.key(['home'], () => {
-      box.setScroll(0);
-      this.screen.render();
-    });
-    this.screen.key(['end'], () => {
-      box.setScrollPerc(100);
-      this.screen.render();
-    });
+  lines.push('', { text: 'Encounters', bold: true });
+  for (const encounter of Object.values(encounters)) {
+    lines.push(encounter.defeated
+      ? { text: `  ${encounter.name} · defeated`, tone: 'muted' }
+      : `  ${encounter.name} · ${encounter.currentHp}/${encounter.maxHp} HP`);
   }
 
-  render() {
-    const gameState = this.context.session.gameState;
-    const contentTop = 4;
-    const footerHeight = 3;
-    const contentHeight = Math.max(8, this.screen.height - contentTop - footerHeight);
+  lines.push('', { text: 'Factions', bold: true });
+  for (const [name, score] of Object.entries(factions)) {
+    lines.push(`  ${name.replace(/_/g, ' ')} · ${signed(score)}`);
+  }
 
-    UIComponents.createBox({
-      parent: this.screen,
-      top: 0,
-      left: 0,
-      width: '100%',
-      height: 3,
-      content: '{center}{bold}{magenta-fg}ADVENTURE JOURNAL{/}',
-      tags: true
-    });
+  lines.push('', { text: 'NPC memory', bold: true });
+  for (const npc of Object.values(npcs)) {
+    lines.push(`  ${npc.name} · trust ${signed(npc.trust)}`);
+    const memory = npc.memory[npc.memory.length - 1];
+    lines.push({ text: `    ${memory || 'No interactions yet'}`, tone: 'muted' });
+  }
 
-    if (!gameState?.worldState) {
-      UIComponents.createBox({
-        parent: this.screen,
-        top: 4,
-        left: 2,
-        width: '96%',
-        height: 6,
-        content: '\n  No active adventure. Start a new game to unlock the journal.',
-        style: { border: { fg: 'red' } }
-      });
-      this.renderFooter();
-      return;
+  const log = journalEntries(storyOf(gameState));
+  if (log.length > 0) {
+    lines.push('', { text: 'Log', bold: true });
+    for (const entry of log) {
+      lines.push({ text: `  ${entry.prefix.padEnd(3)} ${entry.text}`, hangingIndent: 4 });
     }
-
-    const questLines = Object.values(gameState.worldState.quests)
-      .map((quest) => `  [${quest.status.toUpperCase()}] ${quest.title} (${Math.round(quest.progress)}%)`)
-      .join('\n');
-
-    const encounterLines = Object.values(gameState.worldState.encounters)
-      .map((encounter) => {
-        if (encounter.defeated) return `  ${encounter.name}: defeated`;
-        return `  ${encounter.name}: ${encounter.currentHp}/${encounter.maxHp} HP`;
-      })
-      .join('\n');
-
-    const factionLines = Object.entries(gameState.worldState.factions)
-      .map(([name, score]) => `  ${name}: ${score}`)
-      .join('\n');
-
-    const npcLines = Object.values(gameState.worldState.npcs)
-      .map((npc) => {
-        const memory = npc.memory[npc.memory.length - 1] || 'No interactions yet';
-        return `  ${npc.name} (trust ${npc.trust})\n    ${memory}`;
-      })
-      .join('\n');
-
-    const missionLog = UIComponents.createBox({
-      parent: this.screen,
-      top: contentTop,
-      left: 'center',
-      width: '94%',
-      height: contentHeight,
-      label: ' Mission Log ',
-      content: `
-{bold}Quests{/}
-${questLines}
-
-{bold}Encounters{/}
-${encounterLines}
-
-{bold}Factions{/}
-${factionLines}
-
-{bold}NPC Memory{/}
-${npcLines}
-`,
-      tags: true,
-      keys: true,
-      vi: true,
-      mouse: true,
-      scrollable: true,
-      alwaysScroll: true,
-      scrollbar: {
-        ch: ' ',
-        style: { bg: 'magenta' }
-      }
-    });
-
-    this.bindScrollKeys(missionLog);
-    this.renderFooter();
-    missionLog.focus();
   }
+  return lines;
+}
 
-  renderFooter() {
-    UIComponents.createBox({
-      parent: this.screen,
-      bottom: 0,
-      left: 0,
-      width: '100%',
-      height: 3,
-      content: '{center}{gray-fg}up/down, pgup/pgdn to scroll | b=back | q=quit{/}',
-      tags: true
-    });
-
-    this.screen.key(['b', 'escape'], () => this.context.navigate('game'));
-  }
+export function JournalScreen({ ctx }) {
+  const gameState = ctx.session.gameState;
+  useBackKeys(ctx);
+  const hasGame = Boolean(gameState?.worldState);
+  return h(
+    Screen,
+    {
+      app: APP_NAME,
+      screen: 'Journal',
+      meta: gameMeta(gameState),
+      hints: hasGame ? SCROLL_HINTS : BACK_HINTS,
+      message: ctx.message
+    },
+    h(
+      Panel,
+      // Empty template: nothing to focus, so the panel keeps the default border.
+      { title: 'Journal', focused: hasGame },
+      hasGame ? h(ScrollView, { lines: journalLines(gameState) }) : h(NoGame)
+    )
+  );
 }

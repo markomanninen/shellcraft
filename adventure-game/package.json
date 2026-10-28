@@ -10,18 +10,20 @@
     "dev": "nodemon src/server/index.js",
     "generate-keys": "node scripts/generate-keys.js",
     "test": "npm run test:unit && npm run test:e2e",
-    "test:unit": "node --test test/unit/*.test.js",
-    "test:e2e": "node --test test/e2e/*.test.js",
+    "test:unit": "node --test --test-timeout=30000 --test-force-exit test/unit/*.test.js",
+    "test:e2e": "node --test --test-timeout=30000 --test-force-exit test/e2e/*.test.js",
     "test:watch": "node --test --watch"
   },
   "keywords": ["ssh", "terminal", "tui", "adventure", "game", "cli"],
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "ssh2": "^1.15.0",
-    "blessed": "^0.1.81",
+    "@shellcraft/ui": "file:../ui",
     "dotenv": "^17.3.1",
-    "nanoid": "^5.0.4"
+    "ink": "^8.0.0",
+    "nanoid": "^5.0.4",
+    "react": "^19.3.1",
+    "ssh2": "^1.15.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.2",

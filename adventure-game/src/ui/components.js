@@ -1,113 +1,55 @@
-import blessed from 'blessed';
+// Small pieces the adventure screens share, built from @shellcraft/ui.
+import React from 'react';
+import { EmptyState, useInput, textWidth } from '@shellcraft/ui';
+import { GAME_CONFIG } from '../config/game-config.js';
 
-export class UIComponents {
-  static createBox(options = {}) {
-    return blessed.box({
-      border: { type: 'line' },
-      style: {
-        border: { fg: 'cyan' },
-        ...options.style
-      },
-      ...options
-    });
-  }
+const h = React.createElement;
 
-  static createList(options = {}) {
-    return blessed.list({
-      border: { type: 'line' },
-      style: {
-        border: { fg: 'cyan' },
-        selected: { bg: 'blue', fg: 'white' },
-        item: { fg: 'white' },
-        ...options.style
-      },
-      keys: true,
-      vi: true,
-      mouse: true,
-      ...options
-    });
-  }
+export const APP_NAME = GAME_CONFIG.app.name;
 
-  static createTable(options = {}) {
-    return blessed.listtable({
-      border: { type: 'line' },
-      style: {
-        border: { fg: 'cyan' },
-        header: { fg: 'yellow', bold: true },
-        cell: { fg: 'white' },
-        ...options.style
-      },
-      align: 'left',
-      keys: true,
-      vi: true,
-      ...options
-    });
-  }
+export const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
-  static createForm(options = {}) {
-    return blessed.form({
-      border: { type: 'line' },
-      style: {
-        border: { fg: 'cyan' },
-        ...options.style
-      },
-      keys: true,
-      vi: true,
-      ...options
-    });
-  }
+/** Title bar meta: the turn, or that there is no game. */
+export const gameMeta = (gameState) => (gameState ? `turn ${gameState.moves}` : 'no game');
 
-  static createInput(options = {}) {
-    return blessed.textbox({
-      border: { type: 'line' },
-      style: {
-        border: { fg: 'green' },
-        focus: { border: { fg: 'yellow' } },
-        ...options.style
-      },
-      inputOnFocus: true,
-      ...options
-    });
-  }
+/** Hints of the secondary screens (Empty template: h menu, b back, q quit). */
+export const BACK_HINTS = Object.freeze([['h', 'menu'], ['b', 'back'], ['q', 'quit']]);
+export const SCROLL_HINTS = Object.freeze([['↑↓', 'scroll'], ...BACK_HINTS]);
 
-  static createButton(options = {}) {
-    return blessed.button({
-      border: { type: 'line' },
-      style: {
-        border: { fg: 'green' },
-        focus: { border: { fg: 'yellow' }, bg: 'blue' },
-        ...options.style
-      },
-      mouse: true,
-      ...options
-    });
-  }
+/** Journal, stats and inventory before a game exists: not an error, no red. */
+export function NoGame() {
+  return h(EmptyState, {
+    message: 'No adventure yet.',
+    hint: 'Start one from the menu:',
+    k: 'h',
+    label: 'menu'
+  });
+}
 
-  static showMessage(screen, message, type = 'info') {
-    const colors = {
-      info: 'blue',
-      success: 'green',
-      error: 'red',
-      warning: 'yellow'
+const PREFIX_WIDTH = 4; // "T12 "
+
+/**
+ * Journal entries as ScrollView lines: `T1  Arrived at …` with the turn
+ * muted and wrapped lines under the text (hanging indent).
+ */
+export function logLines(entries) {
+  return entries.map((entry) => {
+    const prefix = `${entry.prefix.padEnd(PREFIX_WIDTH - 1)} `;
+    return {
+      segments: [{ text: prefix, tone: 'muted' }, { text: entry.text }],
+      hangingIndent: textWidth(prefix),
+      keepIndent: false
     };
+  });
+}
 
-    const msg = blessed.message({
-      parent: screen,
-      top: 'center',
-      left: 'center',
-      width: '50%',
-      height: 'shrink',
-      border: { type: 'line' },
-      style: {
-        border: { fg: colors[type] },
-        bg: colors[type],
-        fg: 'white'
-      }
-    });
-
-    msg.display(message, 3, () => {
-      msg.destroy();
-      screen.render();
-    });
-  }
+/**
+ * Keys of the secondary screens: h menu, b / esc back to where the player
+ * came from (the room or the menu).
+ */
+export function useBackKeys(ctx) {
+  useInput((input, key) => {
+    if (input === 'h') ctx.navigate('game');
+    else if (input === 'b' || key.escape) ctx.back();
+  });
 }

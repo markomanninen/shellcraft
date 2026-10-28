@@ -2,10 +2,14 @@
 
 A complete template for building SSH-based terminal applications with TUI (Text User Interface).
 
+<p align="center">
+  <img src="../docs/images/demo-shop.svg" alt="demo-shop: browse, add to cart, cart, checkout with an email error, order placed" width="748">
+</p>
+
 ## 🌟 Features
 
 - **SSH Server**: Built with ssh2 for secure remote access
-- **TUI Framework**: Beautiful terminal UI using blessed
+- **TUI Framework**: Ink (React for the terminal) through the shared `@shellcraft/ui` package
 - **Session Management**: User session tracking with public key authentication
 - **Component Library**: Reusable UI components (lists, tables, forms, buttons)
 - **Navigation System**: Easy screen-to-screen routing
@@ -17,14 +21,15 @@ A complete template for building SSH-based terminal applications with TUI (Text 
 src/
 ├── server/          # SSH server and routing
 │   ├── index.js     # Main server entry point
-│   ├── router.js    # Screen navigation router
+│   ├── router.js    # Hands each SSH shell to the Ink app (serve())
 │   └── session.js   # Session management
-├── ui/              # User interface screens
-│   ├── components.js # Reusable UI components
-│   ├── home.js      # Home screen
-│   ├── products.js  # Products listing
-│   ├── cart.js      # Shopping cart
-│   └── checkout.js  # Checkout flow
+├── ui/              # User interface screens (Ink components)
+│   ├── app.js       # ShopApp: current screen, status message, cart actions
+│   ├── home.js      # Home screen (menu + cart summary)
+│   ├── products.js  # Products table
+│   ├── cart.js      # Shopping cart table
+│   ├── checkout.js  # Checkout form and validation
+│   └── cart-summary.js # Cart helpers and the cart summary block
 └── models/          # Data models
     └── product.js   # Product data model
 ```
@@ -63,92 +68,81 @@ If your shell does not auto-load Node/npm, use the local wrapper:
 
 ## 🎨 UI Components
 
-### Available Components
+The screens use the shared Ink package [`@shellcraft/ui`](../ui/README.md)
+(`file:../ui`, copied into `node_modules` by `install-links=true` in
+`.npmrc`). It provides `Screen` (title bar, body, status bar), `Panel`,
+`SelectList`, `Table`, `TextField`, `Button`, `Meter`, `EmptyState`,
+`KeyHint`, `Message` and the SSH adapter `serve()`. Colors come only from
+its theme (ANSI names; cyan for focus and selection, red only for errors;
+muted text and unfocused borders are the default color dimmed).
 
-- **Box**: Static content container
-- **List**: Selectable menu/list
-- **Table**: Data grid display
-- **Form**: Input form container
-- **Input**: Text input field
-- **Button**: Clickable button
-- **Message**: Popup notification
+The screens follow the Figma templates:
 
-### Example Usage
+- **Home** (Menu + detail): menu panel with focus, cart summary beside it.
+  `↑↓ move  ⏎ select  1-3 jump  q quit`
+- **Products** (Table): `↑↓ move  a add to cart  c cart  b back`; "Added …
+  to cart" appears in the status bar.
+- **Cart** (Table + total): `c checkout  x clear cart  b back`
+- **Checkout** (Form): `↑↓` picks a field, `⏎` edits it (`⏎` saves, `esc`
+  cancels), `⏎` on `[ Place order ]` validates (name, a full email address,
+  address) and places the order. `b back`.
 
-```javascript
-import { UIComponents } from './ui/components.js';
+`q` quits everywhere except while editing a field; Ctrl-C always quits.
 
-// Create a menu
-const menu = UIComponents.createList({
-  parent: screen,
-  top: 5,
-  left: 'center',
-  width: '50%',
-  height: 10,
-  label: ' Menu ',
-  items: ['Option 1', 'Option 2', 'Option 3']
-});
-
-menu.on('select', (item, index) => {
-  console.log('Selected:', item);
-});
-```
+After changing `../ui`, refresh the copy with `./npmw ci`.
 
 ## 🔌 Creating New Screens
 
+A screen is a function component that gets `ctx` from `src/ui/app.js`:
+
 ```javascript
-import { UIComponents } from './components.js';
+import React from 'react';
+import { Screen, Panel, Text, useInput } from '@shellcraft/ui';
 
-export class MyScreen {
-  constructor(context) {
-    this.context = context;
-    this.screen = context.screen;
-    this.render();
-  }
+const h = React.createElement;
 
-  render() {
-    // Create UI elements
-    const box = UIComponents.createBox({
-      parent: this.screen,
-      top: 'center',
-      left: 'center',
-      width: '50%',
-      height: '50%',
-      content: 'Hello World!'
-    });
+export function MyScreen({ ctx }) {
+  useInput((input, key) => {
+    if (input === 'b' || key.escape) ctx.navigate('home');
+  });
 
-    // Add navigation
-    this.screen.key(['escape'], () => {
-      this.context.navigate('home');
-    });
-  }
+  return h(
+    Screen,
+    { app: 'Demo Shop', screen: 'Mine', hints: [['b', 'back']], message: ctx.message },
+    h(Panel, { title: 'Hello', focused: true }, h(Text, null, 'Hello World!'))
+  );
 }
 ```
 
-Then register in `src/server/router.js`:
+Then register it in `src/ui/app.js`:
 
 ```javascript
-import { MyScreen } from '../ui/myscreen.js';
+import { MyScreen } from './myscreen.js';
 
-this.screens = {
+export const screens = {
   home: HomeScreen,
-  myscreen: MyScreen,  // Add here
+  mine: MyScreen,
   // ...
 };
 ```
 
 ## 🔐 Authentication
 
-The server supports two authentication modes:
+The server signs users in with `authenticate()` from
+[`@shellcraft/ui/auth`](../ui/README.md#ssh-authentication-shellcraftuiauth):
 
-1. **Public Key**: Users connecting with SSH keys get a unique fingerprint
-2. **Anonymous**: Users without keys can connect anonymously
+1. **Public key**: the client must prove it holds the key; the session gets
+   its fingerprint (`SHA256:...`, as `ssh-keygen -l` shows it)
+2. **Anonymous**: a client without a key signs in through
+   keyboard-interactive, with no prompts
+
+The `none` method and passwords are turned away, so OpenSSH offers its keys.
 
 Access the session in any screen:
 
 ```javascript
-const fingerprint = this.context.session.fingerprint;
-const cart = this.context.session.cart;
+const fingerprint = ctx.session.fingerprint;
+const cart = ctx.session.cart;
 ```
 
 ## 📦 Session Data
@@ -160,20 +154,18 @@ Each session includes:
 - `createdAt`: Session creation timestamp
 - `cart`: Shopping cart items
 - `user`: User profile data (if logged in)
+- `checkoutFormData`: Checkout fields typed so far
+- `orders`: Orders placed in this session
 
 ## 🎯 Navigation
 
 Navigate between screens using the context:
 
 ```javascript
-// Navigate to products screen
-this.context.navigate('products');
-
-// Navigate with data
-this.context.navigate('product-detail', { productId: '123' });
-
-// Exit application
-this.context.exit();
+ctx.navigate('products');                 // switch screen (clears the message)
+ctx.notify('success', 'Saved');           // status bar message
+ctx.addToCart(product);                   // cart actions re-render the screen
+ctx.quit();                               // end the SSH session
 ```
 
 ## 🛠️ Development
@@ -212,24 +204,18 @@ const db = new Database('data/shop.db');
 
 ## 🎨 Customization
 
-### Colors
-
-Blessed supports 256 colors. Common color names:
-
-- `black`, `red`, `green`, `yellow`, `blue`, `magenta`, `cyan`, `white`
-- `gray`, `lightred`, `lightgreen`, `lightyellow`, etc.
-
-### Borders
-
-Border types: `line`, `bg`, `ch`, `heavy`, etc.
+Colors, glyphs and tones live in `../ui/src/theme.js`. Use the theme tokens
+(`theme.text.muted`, `theme.border.focus`, ...) instead of color names, and
+keep sizes in whole cells: the screens are designed for 80×24 and also
+checked at 100×30.
 
 ## 📝 Best Practices
 
-1. **Always clean up**: Destroy elements before navigating away
-2. **Use context**: Pass session and navigation through context
-3. **Handle errors**: Wrap API calls in try/catch
-4. **Focus management**: Always set focus to a focusable element
-5. **Key bindings**: Provide intuitive keyboard shortcuts
+1. **Use context**: Pass session and navigation through `ctx`
+2. **One focused panel**: only the focused list or table gets `isActive`
+3. **Messages in the status bar**: no boxes over content
+4. **Handle errors**: Wrap API calls in try/catch
+5. **Key bindings**: same syntax everywhere (`q quit`, `b back`, `⏎ select`)
 
 ## 🚢 Deployment
 
@@ -242,12 +228,15 @@ pm2 start src/server/index.js --name demo-shop
 
 ### Using Docker
 
+Build from the repository root, because the app depends on `../ui`:
+
 ```dockerfile
-FROM node:20-alpine
+FROM node:24-alpine
 WORKDIR /app
-COPY package*.json ./
-RUN npm ci --production
-COPY . .
+COPY ui ./ui
+COPY demo-shop ./demo-shop
+WORKDIR /app/demo-shop
+RUN npm ci --omit=dev
 RUN npm run generate-keys
 EXPOSE 2222
 CMD ["npm", "start"]
@@ -268,7 +257,9 @@ MIT License - feel free to use this template for any project!
 ## 🔗 Resources
 
 - [ssh2 Documentation](https://github.com/mscdex/ssh2)
-- [blessed Documentation](https://github.com/chjj/blessed)
+- [Ink Documentation](https://github.com/vadimdemedes/ink)
+- [@shellcraft/ui](../ui/README.md)
+
 ## 💡 Ideas for Extension
 
 - User authentication system

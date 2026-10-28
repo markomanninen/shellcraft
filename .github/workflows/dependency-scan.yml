@@ -12,12 +12,13 @@ jobs:
   npm-audit:
     name: NPM Audit
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: read
     
     strategy:
       matrix:
-        app: [demo-shop, admin-dashboard, adventure-game, animation-demo]
+        app: [ui, demo-shop, admin-dashboard, adventure-game, animation-demo]
       fail-fast: false
     
     steps:

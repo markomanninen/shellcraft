@@ -1,104 +1,61 @@
-import blessed from 'blessed';
-import { UIComponents } from './components.js';
+import React, { useState } from 'react';
+import { Screen, Panel, Table, TableRow, EmptyState, Box, useInput, useTerminalSize } from '@shellcraft/ui';
+import { cartLines, cartMeta, cartTotal, money } from './cart-summary.js';
 
-export class CartScreen {
-  constructor(context) {
-    this.context = context;
-    this.screen = context.screen;
-    this.render();
-  }
+const h = React.createElement;
 
-  render() {
-    // Header
-    UIComponents.createBox({
-      parent: this.screen,
-      top: 0,
-      left: 0,
-      width: '100%',
-      height: 3,
-      content: '{center}{bold}{cyan-fg}SHOPPING CART{/}',
-      tags: true,
-      border: { type: 'line' },
-      style: { border: { fg: 'cyan' } }
-    });
+export const CART_COLUMNS = [
+  { label: 'Product', width: 24, grow: true },
+  { label: 'Qty', width: 5, align: 'right' },
+  { label: 'Price', width: 9, align: 'right' },
+  { label: 'Subtotal', width: 10, align: 'right' }
+];
 
-    const cart = this.context.session.cart;
-    
-    if (cart.length === 0) {
-      // Empty cart message
-      UIComponents.createBox({
-        parent: this.screen,
-        top: 'center',
-        left: 'center',
-        width: 40,
-        height: 5,
-        content: '{center}{yellow-fg}Your cart is empty!{/}\n{center}Browse products to add items.',
-        tags: true,
-        border: { type: 'line' },
-        style: { border: { fg: 'yellow' } }
-      });
-    } else {
-      const total = cart.reduce((sum, item) => sum + item.price, 0);
-      
-      // Cart items table
-      blessed.listtable({
-        parent: this.screen,
-        top: 4,
-        left: 2,
-        width: '96%',
-        height: '60%',
-        label: ' Cart Items ',
-        border: { type: 'line' },
-        style: {
-          border: { fg: 'cyan' },
-          header: { fg: 'yellow', bold: true },
-          cell: { fg: 'white' },
-          selected: { bg: 'white', fg: 'black', bold: true }
-        },
-        align: 'left',
-        keys: true,
-        vi: true,
-        mouse: true,
-        interactive: true,
-        noCellBorders: true,
-        data: [
-          ['Name', 'Price'],
-          ...cart.map(item => [item.name, `$${item.price.toFixed(2)}`]),
-          ['', ''],
-          ['TOTAL', `$${total.toFixed(2)}`]
-        ]
-      });
+/** Table template with a total row: c checkout, x clear cart, b back. */
+export function CartScreen({ ctx }) {
+  const { cart } = ctx.session;
+  const lines = cartLines(cart);
+  const [index, setIndex] = useState(0);
+  const { rows } = useTerminalSize();
+
+  useInput((input, key) => {
+    if (input === 'c') {
+      if (cart.length > 0) ctx.navigate('checkout');
+      else ctx.notify('warning', 'Cart is empty');
+    } else if (input === 'x') {
+      ctx.clearCart();
+    } else if (input === 'b' || key.escape) {
+      ctx.navigate('home');
     }
+  });
 
-    // Footer
-    UIComponents.createBox({
-      parent: this.screen,
-      bottom: 0,
-      left: 0,
-      width: '100%',
-      height: 1,
-      content: '{center}{gray-fg}[C] Checkout | [X] Clear Cart | [B] Back{/}',
-      tags: true
-    });
+  const body =
+    lines.length === 0
+      ? h(EmptyState, { message: 'Your cart is empty.', hint: 'Browse products from the menu:', k: 'b', label: 'back' })
+      : h(
+          Box,
+          { flexDirection: 'column', flexGrow: 1 },
+          h(Table, {
+            columns: CART_COLUMNS,
+            rows: lines.map((l) => [l.product.name, String(l.qty), money(l.product.price), money(l.subtotal)]),
+            selectedIndex: index,
+            onChange: setIndex,
+            // title, top edge, header, blank, total, bottom edge, status
+            height: Math.max(rows - 7, 1)
+          }),
+          h(Box, { height: 1 }),
+          h(TableRow, { columns: CART_COLUMNS, cells: ['Total', '', '', money(cartTotal(cart))], bold: true })
+        );
 
-    // Key handlers
-    this.screen.key(['c'], () => {
-      if (cart.length > 0) {
-        this.context.navigate('checkout');
-      } else {
-        UIComponents.showMessage(this.screen, 'Cart is empty!', 'warning');
-      }
-    });
-
-    this.screen.key(['x'], () => {
-      this.context.session.cart = [];
-      this.context.navigate('cart');
-    });
-
-    this.screen.key(['b', 'escape'], () => {
-      this.context.navigate('home');
-    });
-
-    this.screen.render();
-  }
+  return h(
+    Screen,
+    {
+      app: 'Demo Shop',
+      screen: 'Cart',
+      meta: cartMeta(cart),
+      hints: [['↑↓', 'move'], ['c', 'checkout'], ['x', 'clear cart'], ['b', 'back']],
+      message: ctx.message
+    },
+    h(Panel, { title: 'Cart', focused: true, padding: 0 }, body)
+  );
 }
