@@ -26,6 +26,8 @@ function fakeCtx(method, extra = {}) {
  * A key pair from ssh2's keygen. ssh2 1.17.0 drops every leading zero byte of
  * an ed25519 public key, so about one key in 256 comes out 31 bytes long and
  * does not parse back (parseKey returns an Error); such a key is made again.
+ * Upstream: https://github.com/mscdex/ssh2/issues/1513 (fix in PR #1515); drop
+ * the retry once a release has the fix.
  */
 function keyPair(type = 'ed25519') {
   for (;;) {

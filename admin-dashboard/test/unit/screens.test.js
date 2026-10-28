@@ -1,7 +1,7 @@
 import { describe, it, afterEach } from 'node:test';
 import { strict as assert } from 'assert';
 import React from 'react';
-import { renderTerminal, cleanupTerminals, styleAt, styleAtCell, boldDimText, tick } from '@shellcraft/ui/testing';
+import { renderTerminal, cleanupTerminals, styleAt, styleAtCell, boldDimText, tick, waitFor } from '@shellcraft/ui/testing';
 import { AdminApp } from '../../src/ui/app.js';
 import { MENU } from '../../src/ui/dashboard.js';
 import { meterTone } from '../../src/ui/parts.js';
@@ -282,6 +282,7 @@ describe('Screens (80x24)', () => {
     const header = 'USER PID %CPU %MEM VSZ RSS TTY STAT START TIME COMMAND';
     const many = [header, ...Array.from({ length: 40 }, (_, i) => `demo ${100 + i} 0.0 0.1 1000 2048 ? S 10:00 0:00 worker ${i}`)].join('\n');
     const { t } = await open({ initialScreen: 'processes', system: new DemoSystem({ processes: many }) });
+    await waitFor(() => t.lines()[21]?.startsWith('│ ↓ 22 more'), { message: 'the process list' });
     let lines = assertScreen(t, 80, 24, 'Processes');
     assert.ok(lines[21].startsWith('│ ↓ 22 more'), lines[21]);
     assert.ok(statusRow(t).startsWith(' ↑↓ scroll'));
