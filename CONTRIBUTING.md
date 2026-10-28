@@ -79,8 +79,8 @@ Run the tests of every app that uses what you changed.
 
 ### Changing the Generator
 
-The Generator workflow (`.github/workflows/generator.yml`) generates both app
-types and runs their tests when `init.sh`, `quick-start.sh` or `ui/` change.
+CI (`.github/workflows/ci.yml`) generates both app types and runs their tests
+when `init.sh`, `quick-start.sh` or `ui/` change.
 To check locally, generate each app type outside the repository and run its
 tests:
 

@@ -1,0 +1,202 @@
+name: CI
+
+# One workflow for everything: tests, npm audit, the generator and CodeQL.
+# A pull request runs only what its changes can break: an app's tests and
+# audit when the app changes, every app when ui/ (which they all use) or this
+# file changes, the generator when init.sh, quick-start.sh or ui/ change, and
+# CodeQL when any app code changes. Nothing runs again on the merge to main;
+# the pull request already tested that code. The weekly run checks everything,
+# so new npm advisories and CodeQL rules show up without a pull request.
+
+on:
+  pull_request:
+    branches: [ "main" ]
+  schedule:
+    - cron: '0 3 * * 1'  # Mondays 03:00 UTC
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    name: What changed
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      apps: ${{ steps.pick.outputs.apps }}
+      generator: ${{ steps.pick.outputs.generator }}
+
+    steps:
+    - name: Match changed paths
+      id: filter
+      if: github.event_name == 'pull_request'
+      uses: dorny/paths-filter@v4
+      with:
+        filters: |
+          shared:
+            - 'ui/**'
+            - '.github/workflows/ci.yml'
+          ui: 'ui/**'
+          demo-shop: 'demo-shop/**'
+          admin-dashboard: 'admin-dashboard/**'
+          adventure-game: 'adventure-game/**'
+          animation-demo: 'animation-demo/**'
+          generator:
+            - 'init.sh'
+            - 'quick-start.sh'
+
+    - name: Pick the jobs to run
+      id: pick
+      env:
+        EVENT: ${{ github.event_name }}
+        CHANGES: ${{ steps.filter.outputs.changes || '[]' }}
+      run: |
+        all='["ui","demo-shop","admin-dashboard","adventure-game","animation-demo"]'
+        if [ "$EVENT" != pull_request ] || jq -e 'index("shared")' <<<"$CHANGES" >/dev/null; then
+          apps=$all
+          generator=true
+        else
+          apps=$(jq -c --argjson all "$all" '[.[] | select(. as $c | $all | index($c))]' <<<"$CHANGES")
+          generator=$(jq 'index("generator") != null' <<<"$CHANGES")
+        fi
+        echo "apps=$apps" >> "$GITHUB_OUTPUT"
+        echo "generator=$generator" >> "$GITHUB_OUTPUT"
+        echo "Apps: $apps, generator: $generator"
+
+  test:
+    name: Test (${{ matrix.app }})
+    needs: changes
+    if: needs.changes.outputs.apps != '[]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    strategy:
+      fail-fast: false
+      matrix:
+        app: ${{ fromJSON(needs.changes.outputs.apps) }}
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v7
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v7
+      with:
+        node-version: '24'
+        cache: 'npm'
+        cache-dependency-path: ${{ matrix.app }}/package-lock.json
+
+    - name: Install dependencies
+      working-directory: ${{ matrix.app }}
+      run: npm ci
+
+    - name: Generate SSH keys for E2E tests
+      if: matrix.app != 'animation-demo' && matrix.app != 'ui'
+      working-directory: ${{ matrix.app }}
+      run: npm run generate-keys
+
+    - name: Run tests
+      working-directory: ${{ matrix.app }}
+      run: npm test
+
+    - name: npm audit (high and critical)
+      working-directory: ${{ matrix.app }}
+      run: npm audit --audit-level=high
+
+  # init.sh copies ui/ into every app it generates, so a change to either can
+  # break a generated app; this checks both app types end to end.
+  shellcheck:
+    name: ShellCheck
+    needs: changes
+    if: needs.changes.outputs.generator == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v7
+
+    - name: Run shellcheck
+      run: shellcheck init.sh quick-start.sh
+
+  generate:
+    name: Generate and test (${{ matrix.type }})
+    needs: changes
+    if: needs.changes.outputs.generator == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    strategy:
+      fail-fast: false
+      matrix:
+        type: [minimal, ecommerce]
+
+    env:
+      APP_TYPE: ${{ matrix.type }}
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v7
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v7
+      with:
+        node-version: '24'
+
+    - name: Generate the app
+      run: ./init.sh "$RUNNER_TEMP/gen-app" "$APP_TYPE"
+
+    - name: Install dependencies
+      working-directory: ${{ runner.temp }}/gen-app
+      run: npm install
+
+    - name: Check the dependency tree (npm ls, one React)
+      working-directory: ${{ runner.temp }}/gen-app
+      run: |
+        npm ls
+        test "$(npm ls react --all --parseable | grep -c '/react$')" -eq 1
+
+    - name: Generate SSH keys for E2E tests
+      working-directory: ${{ runner.temp }}/gen-app
+      run: |
+        if [ "$(npm pkg get scripts.generate-keys)" != "{}" ]; then
+          npm run generate-keys
+        fi
+
+    - name: Run tests
+      working-directory: ${{ runner.temp }}/gen-app
+      run: npm test
+
+  codeql:
+    name: CodeQL
+    needs: changes
+    if: needs.changes.outputs.apps != '[]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v7
+
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v4
+      with:
+        languages: javascript
+        queries: security-extended,security-and-quality
+
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v4
+      with:
+        category: "/language:javascript"
