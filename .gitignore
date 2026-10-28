@@ -4,3 +4,6 @@
 *.swo
 .env
 node_modules/
+
+# Design capture output (regenerate with design/capture/capture-all.sh)
+design/capture/out/
