@@ -58,3 +58,17 @@ updates:
       - "dependencies"
       - "animation-demo"
     versioning-strategy: increase
+
+  # @shellcraft/ui (the shared package every app installs). Lockfile only:
+  # its package.json ranges, the ink/react/ssh2 peer ranges among them, are
+  # what the apps must satisfy and are changed by hand, not by a bump.
+  - package-ecosystem: "npm"
+    directory: "/ui"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "ui"
+    versioning-strategy: lockfile-only
