@@ -63,7 +63,7 @@ export function JournalScreen({ ctx }) {
     {
       app: APP_NAME,
       screen: 'Journal',
-      meta: gameMeta(gameState),
+      meta: gameMeta(ctx.session),
       hints: hasGame ? SCROLL_HINTS : BACK_HINTS,
       message: ctx.message
     },

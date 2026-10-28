@@ -215,4 +215,84 @@ describe('SSH Server E2E', () => {
     await assert.rejects(signIn({ tryKeyboard: false }), /authentication methods failed/);
     await assert.rejects(signIn({ password: 'test', tryKeyboard: false }), /authentication methods failed/);
   });
+
+  const plainText = (text) => text.replace(/\u001B\[[0-?]*[ -/]*[@-~]/g, '');
+  const rsaKey = () => generateKeyPairSync('rsa', {
+    modulusLength: 2048,
+    privateKeyEncoding: { type: 'pkcs1', format: 'pem' },
+    publicKeyEncoding: { type: 'spki', format: 'pem' }
+  }).privateKey;
+  async function until(predicate, what, timeout = 5000) {
+    const deadline = Date.now() + timeout;
+    while (!predicate()) {
+      if (Date.now() > deadline) throw new Error(`Timed out waiting for ${what}`);
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+  }
+
+  /**
+   * Sign in, open an 80x24 shell and wait for the menu; then(stream) runs
+   * (default: quit with q). Resolves with the menu as first drawn, as plain
+   * text, once the shell closes.
+   */
+  function openMenu(options, then = (stream) => stream.write('q')) {
+    return new Promise((resolve, reject) => {
+      const conn = new Client();
+      conn.on('keyboard-interactive', (_name, _instructions, _lang, _prompts, finish) => finish([]));
+      let output = '';
+      let menu = null;
+      const fail = (err) => {
+        conn.end();
+        reject(err);
+      };
+      conn.on('ready', () => {
+        conn.shell({ cols: 80, rows: 24, term: 'xterm-256color' }, (err, stream) => {
+          if (err) return fail(err);
+          stream.on('data', (data) => {
+            output += data.toString();
+            const text = plainText(output);
+            if (menu === null && text.includes('Terminal Adventure › Menu') && text.includes('q quit')) {
+              menu = text;
+              Promise.resolve(then(stream)).catch(fail);
+            }
+          });
+          stream.on('close', () => {
+            conn.end();
+            resolve(menu ?? '');
+          });
+        });
+      });
+      conn.on('error', reject);
+      conn.connect({ host: 'localhost', port: TEST_PORT, readyTimeout: 5000, tryKeyboard: true, ...options });
+    });
+  }
+
+  it('a saved game belongs to the SSH key, not to the login name', async () => {
+    const sessionsFile = path.join(dataDir, 'sessions.json');
+    const savedGames = () => (fs.existsSync(sessionsFile) ? JSON.parse(fs.readFileSync(sessionsFile, 'utf8')) : [])
+      .filter((entry) => entry.gameState);
+    const adaKey = rsaKey();
+
+    // Ada starts a game. The turn is saved before the Game Master is asked
+    // (who cannot be reached here), so the save is there to come back to.
+    const first = await openMenu({ username: 'ada', privateKey: adaKey }, async (stream) => {
+      stream.write('\r');
+      await until(() => savedGames().length === 1, 'the save');
+      stream.write('q');
+    });
+    assert.ok(first.includes('Start new adventure'));
+    assert.ok(!first.includes('not saved'));
+    assert.equal(savedGames()[0].username, 'ada');
+    assert.match(savedGames()[0].owner, /^SHA256:/);
+
+    const otherKey = await openMenu({ username: 'ada', privateKey: rsaKey() });
+    assert.ok(!otherKey.includes('Continue adventure'), 'another key with the same name gets no game');
+    const noKey = await openMenu({ username: 'ada' });
+    assert.ok(!noKey.includes('Continue adventure'), 'no key with the same name gets no game');
+    assert.ok(noKey.includes('no game · not saved'));
+
+    const sameKey = await openMenu({ username: 'ada-laptop', privateKey: adaKey });
+    assert.ok(sameKey.includes('Continue adventure'), 'the same key resumes under another name');
+    assert.equal(savedGames().length, 1, 'nothing saved for the other two');
+  });
 });

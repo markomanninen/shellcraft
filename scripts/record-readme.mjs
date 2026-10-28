@@ -402,12 +402,12 @@ const SCENARIOS = {
     const React = (await importFrom('adventure-game', 'react')).default;
     const { renderTerminal } = await importFrom('adventure-game', '@shellcraft/ui/src/testing.js');
     const { AdventureApp } = await importFrom('adventure-game', './src/ui/app.js');
-    const { stubLlm, tempSessions } = await importFrom('adventure-game', './test/helpers/adventure.js');
+    const { stubLlm, tempSessions, testKey } = await importFrom('adventure-game', './test/helpers/adventure.js');
     const log = console.log;
     console.log = () => {};
     const store = tempSessions();
     try {
-      const session = store.manager.createSession('ada');
+      const session = store.manager.createSession('ada', testKey('ada')); // signed in with a key: the game is saved
       const llm = stubLlm({ gate: true });
       const t = renderTerminal(
         React.createElement(AdventureApp, { session, saveGame: () => store.manager.saveSession(session.id), llm }),

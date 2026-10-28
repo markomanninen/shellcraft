@@ -61,7 +61,7 @@ the reference app for the generator's `ecommerce` template.
 A text adventure narrated by a Game Master LLM through [Ollama](https://ollama.com/):
 
 - deterministic game rules; the LLM only narrates (`OLLAMA_MODEL` picks the model)
-- sessions saved to `data/sessions.json`, so players can reconnect and continue
+- games saved to `data/sessions.json` for the player's SSH key, so the same key continues the game (a login name alone does not; without a key the game is not saved)
 - free-text input to the Game Master next to suggested actions
 - a busy spinner in the status bar while the LLM answers
 - strict checks on the LLM's answers (invalid payloads fail fast)

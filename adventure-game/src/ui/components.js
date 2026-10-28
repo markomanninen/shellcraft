@@ -9,8 +9,15 @@ export const APP_NAME = GAME_CONFIG.app.name;
 
 export const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
-/** Title bar meta: the turn, or that there is no game. */
-export const gameMeta = (gameState) => (gameState ? `turn ${gameState.moves}` : 'no game');
+/**
+ * Title bar meta: the turn, or that there is no game; for a player without
+ * an SSH key also that the game is not saved.
+ */
+export function gameMeta(session) {
+  const gameState = session?.gameState;
+  const meta = gameState ? `turn ${gameState.moves}` : 'no game';
+  return session?.anonymous ? `${meta} · not saved` : meta;
+}
 
 /** Hints of the secondary screens (Empty template: h menu, b back, q quit). */
 export const BACK_HINTS = Object.freeze([['h', 'menu'], ['b', 'back'], ['q', 'quit']]);

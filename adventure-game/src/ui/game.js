@@ -66,7 +66,7 @@ export function MenuScreen({ ctx }) {
     {
       app: APP_NAME,
       screen: 'Menu',
-      meta: gameMeta(gameState),
+      meta: gameMeta(ctx.session),
       hints: [['↑↓', 'move'], ['⏎', 'select'], [`1-${items.length}`, 'jump'], ['q', 'quit']],
       message: ctx.message
     },

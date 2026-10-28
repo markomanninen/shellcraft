@@ -193,7 +193,7 @@ export function RoomScreen({ ctx }) {
   if (!gameState) {
     return h(
       Screen,
-      { app: APP_NAME, screen: 'Room', meta: gameMeta(null), hints: BACK_HINTS, message: ctx.message },
+      { app: APP_NAME, screen: 'Room', meta: gameMeta(ctx.session), hints: BACK_HINTS, message: ctx.message },
       h(Panel, { title: 'Room' }, h(NoGame))
     );
   }
@@ -307,7 +307,7 @@ export function RoomScreen({ ctx }) {
 
   return h(
     Screen,
-    { app: APP_NAME, screen: status.roomName, meta: gameMeta(gameState), hints, message },
+    { app: APP_NAME, screen: status.roomName, meta: gameMeta(ctx.session), hints, message },
     h(
       Box,
       { flexGrow: 1 },

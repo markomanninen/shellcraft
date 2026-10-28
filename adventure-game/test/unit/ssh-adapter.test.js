@@ -10,7 +10,7 @@ import {
   tick
 } from '@shellcraft/ui/testing';
 import { CommandRouter } from '../../src/server/router.js';
-import { stubLlm, tempSessions } from '../helpers/adventure.js';
+import { stubLlm, tempSessions, testKey } from '../helpers/adventure.js';
 
 let log;
 let store;
@@ -45,7 +45,7 @@ describe('SSH adapter (fake channel)', () => {
   it('renders the menu, plays a turn, resizes, quits on q', async () => {
     const channel = new FakeSshChannel((_text, callback) => callback());
     const sshSession = new FakeSshSession();
-    const session = store.manager.createSession('ssh-player');
+    const session = store.manager.createSession('ssh-player', testKey('ssh-player'));
     const llm = stubLlm({ gate: true });
     gates.push(llm);
     const router = new CommandRouter({ llm });
@@ -94,7 +94,7 @@ describe('SSH adapter (fake channel)', () => {
   });
 
   it('Ctrl-C ends the session; a disconnect while the LLM thinks does not throw', async () => {
-    const session = store.manager.createSession('ssh-other');
+    const session = store.manager.createSession('ssh-other', testKey('ssh-other'));
     const a = new FakeSshChannel((_t, cb) => cb());
     const cleanupA = new CommandRouter({ llm: stubLlm() }).handleConnection(a, session, null, store.manager);
     await waitFor(() => pending(a).includes('Start new adventure'), { message: 'the menu' });

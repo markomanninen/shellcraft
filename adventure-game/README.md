@@ -107,6 +107,12 @@ If a previous process is still bound to the configured SSH port, restart cleanly
 ssh localhost -p 2222
 ```
 
+The game is saved for the SSH key you sign in with: connect with the same
+key to continue, under any login name. Without a key (keyboard-interactive,
+no prompts) you can play, but the game is not saved; the title bar says
+`not saved`. Saves from before key sign-in stay in the sessions file but
+cannot be resumed.
+
 ## Environment Variables
 
 | Variable | Default | Description |

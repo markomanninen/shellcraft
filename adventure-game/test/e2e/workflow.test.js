@@ -47,8 +47,7 @@ describe('Adventure Game Workflow', () => {
     try {
       const sessionManager = new SessionManager({ sessionsFile });
       
-      // Create multiple sessions with different usernames
-      // (SessionManager reuses sessions for the same username for resume support)
+      // Two players without keys: a session each (anonymous ones are never shared)
       const session1 = sessionManager.createSession('player1');
       const session2 = sessionManager.createSession('player2');
       
