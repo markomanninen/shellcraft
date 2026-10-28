@@ -1,11 +1,12 @@
 import { describe, it, before, after, afterEach } from 'node:test';
 import { strict as assert } from 'assert';
+import fs from 'fs';
 import React from 'react';
-import { renderTerminal, cleanupTerminals, styleAt, boldDimText, tick } from '@shellcraft/ui/testing';
+import { renderTerminal, cleanupTerminals, styleAt, boldDimText, tick, waitFor } from '@shellcraft/ui/testing';
 import { AdventureApp } from '../../src/ui/app.js';
 import { createInitialGameState } from '../../src/models/game-state.js';
 import { SessionManager } from '../../src/server/session.js';
-import { stubLlm, tempSessions } from '../helpers/adventure.js';
+import { stubLlm, tempSessions, testKey } from '../helpers/adventure.js';
 
 const h = React.createElement;
 
@@ -28,10 +29,11 @@ afterEach(() => {
   while (stores.length > 0) stores.pop().remove();
 });
 
-function open({ columns = 80, rows = 24, llm = stubLlm(), gameState, initialScreen, username = 'tester' } = {}) {
+// Signed in with a key unless key: null (anonymous).
+function open({ columns = 80, rows = 24, llm = stubLlm(), gameState, initialScreen, username = 'tester', key = testKey(username) } = {}) {
   const store = tempSessions();
   stores.push(store);
-  const session = store.manager.createSession(username);
+  const session = store.manager.createSession(username, key);
   if (gameState) session.gameState = gameState;
   const saveGame = () => store.manager.saveSession(session.id);
   const t = renderTerminal(h(AdventureApp, { session, saveGame, llm, initialScreen }), { columns, rows });
@@ -388,7 +390,7 @@ describe('Adventure screens (80x24)', () => {
     first.t.unmount();
 
     const manager = new SessionManager({ sessionsFile: first.store.sessionsFile });
-    const session = manager.createSession('returning');
+    const session = manager.createSession('returning', testKey('returning'));
     assert.ok(session.gameState.visitedRooms instanceof Set);
     const llm = stubLlm();
     const t = renderTerminal(h(AdventureApp, { session, saveGame: () => manager.saveSession(session.id), llm }));
@@ -399,6 +401,14 @@ describe('Adventure screens (80x24)', () => {
     assertScreen(t, 80, 24, 'Village Square');
     assert.ok(t.text().includes('Lanterns sway over the village square.'));
     assert.equal(llm.calls.length, 0);
+  });
+
+  it('without an SSH key: the title bar says the game is not saved, and nothing is written', async () => {
+    const { t, store } = open({ username: 'guest', key: null });
+    await waitFor(() => t.lines()[0].endsWith('no game · not saved'), { message: 'the menu' });
+    await startGame(t);
+    await waitFor(() => t.lines()[0].endsWith('turn 1 · not saved'), { message: 'turn 1' });
+    assert.equal(fs.existsSync(store.sessionsFile), false);
   });
 
   it('a saved turn the room cannot render is dropped and replayed', async () => {

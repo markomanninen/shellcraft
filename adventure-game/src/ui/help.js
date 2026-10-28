@@ -32,7 +32,8 @@ const TIPS = [
   'Talk to NPCs to unlock better quest paths.',
   'Defeat guardians before reaching for high-value objectives.',
   'Use key items where they matter, especially in the temple.',
-  'Balance exploration and caution as tension rises.'
+  'Balance exploration and caution as tension rises.',
+  'Your game is saved for the SSH key you sign in with; without a key it is gone when you leave.'
 ];
 
 const KEY_WIDTH = 12;
@@ -85,7 +86,7 @@ export function HelpScreen({ ctx }) {
   useBackKeys(ctx);
   return h(
     Screen,
-    { app: APP_NAME, screen: 'Help', meta: gameMeta(ctx.session.gameState), hints: SCROLL_HINTS, message: ctx.message },
+    { app: APP_NAME, screen: 'Help', meta: gameMeta(ctx.session), hints: SCROLL_HINTS, message: ctx.message },
     h(Panel, { title: 'How to play', focused: true }, h(ScrollView, { rows: helpRows(Math.max(columns - 4, 10)) }))
   );
 }

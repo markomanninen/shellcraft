@@ -58,6 +58,12 @@ export function stubLlm({ reply = narrate, outcomes = [], gate = false } = {}) {
   return engine;
 }
 
+/**
+ * A verified SSH public key as authenticate() hands it on ({ algo, data }):
+ * the same name gives the same key, so the same fingerprint.
+ */
+export const testKey = (name) => ({ algo: 'ssh-ed25519', data: Buffer.from(`test key of ${name}`) });
+
 /** A SessionManager on a sessions file in a fresh temp directory. */
 export function tempSessions() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'adventure-ui-'));

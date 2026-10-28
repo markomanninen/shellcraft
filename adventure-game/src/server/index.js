@@ -38,19 +38,25 @@ class TerminalServer {
     console.log('Client connecting...');
 
     let username = null;
+    let publicKey = null;
 
     client.on('authentication', (ctx) => {
-      // The SSH login name keys the saved game (resume across connections).
+      // The login name is only shown; the saved game belongs to the key.
       username = ctx.username;
-      // A key must be proven; without one the player signs in through
-      // keyboard-interactive with no prompts. 'none' and passwords are
-      // turned away. See @shellcraft/ui/auth.
-      authenticate(ctx);
+      // A key must be proven (onKey gets it only after its signature checks
+      // out); without one the player signs in through keyboard-interactive
+      // with no prompts and plays a game that is not saved. 'none' and
+      // passwords are turned away. See @shellcraft/ui/auth.
+      authenticate(ctx, (key) => {
+        publicKey = key;
+      });
     });
 
     client.on('ready', () => {
-      const session = this.sessionManager.createSession(username);
-      console.log(`Client authenticated as "${session.username}"`);
+      const session = this.sessionManager.createSession(username, publicKey);
+      console.log(`Client authenticated as "${session.username}" (${session.owner ?? 'anonymous'})`);
+      // Nothing to come back to: drop it, or every connection stays in memory.
+      if (session.anonymous) client.once('close', () => this.sessionManager.destroySession(session.id));
 
       client.on('session', (accept) => {
         const session_stream = accept();

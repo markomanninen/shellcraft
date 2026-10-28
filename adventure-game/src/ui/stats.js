@@ -82,7 +82,7 @@ export function StatsScreen({ ctx }) {
     {
       app: APP_NAME,
       screen: 'Stats',
-      meta: gameMeta(gameState),
+      meta: gameMeta(ctx.session),
       hints: fits ? BACK_HINTS : SCROLL_HINTS,
       message: ctx.message
     },
