@@ -216,6 +216,15 @@ export function renderTerminal(element, { columns = 80, rows = 24 } = {}) {
 
   const lastFrame = () => stdout.frames.at(-1) ?? '';
 
+  // A frame is written when React commits, but useInput subscribes in an
+  // effect that React's scheduler runs later from setImmediate. On a loaded
+  // machine a test could see a new screen and press a key before its handler
+  // was there, and the key was lost. Let queued effects run first; twice, as
+  // the scheduler hands long work on to the next setImmediate.
+  async function effectsDone() {
+    for (let i = 0; i < 2; i++) await new Promise((resolve) => setImmediate(resolve));
+  }
+
   // After input: wait at least `min` ms, then for the frame the input causes
   // (if it causes one), then until no new frame has come for `quiet` ms. A
   // fixed sleep was enough on a fast machine but not on a loaded CI runner.
@@ -251,6 +260,7 @@ export function renderTerminal(element, { columns = 80, rows = 24 } = {}) {
     waitUntilExit: () => instance.waitUntilExit(),
     /** Write raw input; resolves once the app has re-rendered (see settle). */
     async write(data, wait = 20) {
+      await effectsDone();
       const before = stdout.frames.length;
       stdin.write(data);
       await settle(before, wait);
@@ -258,6 +268,7 @@ export function renderTerminal(element, { columns = 80, rows = 24 } = {}) {
     /** Press keys by name (see `keys`) or literal text, one after another. */
     async press(...names) {
       for (const name of names) {
+        await effectsDone();
         const before = stdout.frames.length;
         stdin.write(keys[name] ?? name);
         // A lone ESC waits for the rest of a possible escape sequence.
