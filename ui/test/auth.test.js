@@ -22,10 +22,17 @@ function fakeCtx(method, extra = {}) {
   return ctx;
 }
 
+/**
+ * A key pair from ssh2's keygen. ssh2 1.17.0 drops every leading zero byte of
+ * an ed25519 public key, so about one key in 256 comes out 31 bytes long and
+ * does not parse back (parseKey returns an Error); such a key is made again.
+ */
 function keyPair(type = 'ed25519') {
-  const pair = utils.generateKeyPairSync(type, type === 'rsa' ? { bits: 2048 } : undefined);
-  const key = utils.parseKey(pair.private);
-  return { pair, key, publicKey: { algo: key.type, data: key.getPublicSSH() } };
+  for (;;) {
+    const pair = utils.generateKeyPairSync(type, type === 'rsa' ? { bits: 2048 } : undefined);
+    const key = utils.parseKey(pair.private);
+    if (!(key instanceof Error)) return { pair, key, publicKey: { algo: key.type, data: key.getPublicSSH() } };
+  }
 }
 
 describe('authenticate (unit)', () => {
@@ -116,7 +123,7 @@ describe('authenticate on a real SSH server', () => {
   const seen = [];
 
   before(async () => {
-    const host = utils.generateKeyPairSync('ed25519');
+    const host = keyPair().pair;
     server = new Server({ hostKeys: [host.private] }, (client) => {
       const record = { key: null, user: null };
       client.on('authentication', (ctx) => {
